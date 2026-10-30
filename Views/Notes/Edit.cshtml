@@ -1,0 +1,4 @@
+@model Note
+<h1>Notu düzenle</h1><form asp-action="Edit" asp-route-id="@Model.Id" method="post" class="form-card">@Html.AntiForgeryToken()<input asp-for="Id" type="hidden" />@if (ViewBag.Inline is true) { <input type="hidden" name="inline" value="true" /> if (ViewBag.ReturnCategory is int rc) { <input type="hidden" name="returnCategory" value="@rc" /> } if (ViewBag.ReturnQ is string rq && rq != "") { <input type="hidden" name="returnQ" value="@rq" /> } if (ViewBag.ReturnCompany is int rco) { <input type="hidden" name="returnCompany" value="@rco" /> } }<partial name="_Fields" model="Model" /></form>
+@* Silme formu düzenleme formunun dışında olmalı: iç içe <form> geçersiz HTML'dir. *@
+<div class="danger-zone">Bu notu artık istemiyor musun? <partial name="_DeleteForm" model="Model" /></div>

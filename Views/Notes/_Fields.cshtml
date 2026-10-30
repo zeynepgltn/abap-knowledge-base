@@ -1,0 +1,11 @@
+@model Note
+<div asp-validation-summary="All" class="error"></div><label asp-for="Title">Başlık</label><input asp-for="Title" placeholder="Örn: ?= downcasting operatörü" required maxlength="180" />
+<label asp-for="Body">Açıklama / not</label><textarea asp-for="Body" rows="9" required placeholder="Ne işe yarar? Ne zaman kullanılır? ..."></textarea>
+<label asp-for="Code">ABAP kodu (isteğe bağlı)</label><textarea asp-for="Code" rows="7" class="code-input" placeholder="DATA(...)"></textarea>
+<div class="row-between"><button type="button" class="secondary" id="suggestBtn">✦ Kategori öner</button><span class="muted">Öneriyi kontrol ederek sen onaylarsın.</span></div><div id="suggestions" class="suggestions"></div>
+<label asp-for="CategoryId">Ana kategori</label><select asp-for="CategoryId" asp-items="ViewBag.CategoryItems" id="CategoryId" data-projects-id="@ViewBag.ProjectsCategoryId"><option value="0">Kategori seç</option></select>
+@* Firma sadece Projeler kategorisi seçiliyken görünür (site.js). *@
+<div id="companyField" class="company-field"><label asp-for="CompanyId">Firma</label><select asp-for="CompanyId" asp-items="ViewBag.CompanyItems"><option value="">Firma yok</option></select></div>
+<label asp-for="Tags">Etiketler (virgülle)</label><input asp-for="Tags" placeholder="CAST, nesne referansı, downcasting" />
+<div class="two"><div><label asp-for="SourceFile">Kaynak dosya (isteğe bağlı)</label><input asp-for="SourceFile" placeholder="abap temel seviye.pdf" /></div><div><label asp-for="SourcePage">Sayfa</label><input asp-for="SourcePage" type="number" min="1" /></div></div>
+<div class="actions"><button type="submit">Notu kaydet</button><a href="@(ViewBag.CancelUrl as string ?? Url.Action("Index"))">Vazgeç</a></div>

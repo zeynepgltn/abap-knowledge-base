@@ -1,0 +1,7 @@
+@{ int status = ViewBag.Status ?? 500; }
+<section class="hero">
+  <p class="eyebrow">HATA @status</p>
+  <h1>@(status == 404 ? "Bulunamadı" : "Bir şeyler ters gitti")</h1>
+  <p>@ViewBag.Message</p>
+</section>
+<p><a class="action" asp-controller="Notes" asp-action="Index">← Notlarıma dön</a></p>

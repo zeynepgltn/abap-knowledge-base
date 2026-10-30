@@ -1,0 +1,19 @@
+@model Note
+@using ABAPKnowledgeBase.Services
+@* Not gövdesini metin, kod bloğu ve resim parçalarına ayırarak çizer. *@
+@foreach (var part in NoteBody.Parse(Model.Body))
+{
+    switch (part.Kind)
+    {
+        case NoteBody.Kind.Code:
+            <pre class="doc-code"><code>@part.Text</code></pre>
+            break;
+        case NoteBody.Kind.Image:
+            <img class="note-img" loading="lazy" alt="Not resmi @part.ImageOrder"
+                 src="@Url.Action("Image", "Notes", new { noteId = Model.Id, order = part.ImageOrder })" />
+            break;
+        default:
+            <div class="body-text">@part.Text</div>
+            break;
+    }
+}

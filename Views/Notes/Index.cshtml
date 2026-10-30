@@ -1,0 +1,142 @@
+@model List<ABAPKnowledgeBase.Models.Note>
+@using ABAPKnowledgeBase.Controllers
+@using System.Linq
+@{
+    var categories = ViewBag.CategoryOverviews as List<NotesController.CategoryOverview> ?? new();
+    int? selectedCategory = ViewBag.SelectedCategory;
+    int? selectedNoteId = ViewBag.SelectedNote;
+    string? query = ViewBag.Query;
+    string? categoryName = ViewBag.CategoryName;
+    bool isListing = selectedCategory.HasValue || !string.IsNullOrWhiteSpace(query);
+    int totalNotes = ViewBag.TotalNotes ?? 0;
+    var selectedNote = Model.FirstOrDefault(n => n.Id == selectedNoteId) ?? Model.FirstOrDefault();
+    bool editing = ViewBag.Edit is true && selectedNote is not null;
+    // Projeler kategorisinin alt alanı: firmalar
+    int? projectsId = ViewBag.ProjectsCategoryId;
+    var companies = ViewBag.Companies as List<NotesController.CategoryOverview> ?? new();
+    int? selectedCompany = ViewBag.SelectedCompany;
+    string? companyName = ViewBag.CompanyName;
+    bool canReorder = ViewBag.CanReorder is true;
+    if (isListing) { ViewData["Wide"] = true; }
+}
+@if (!isListing)
+{
+    <section class="hero"><p class="eyebrow">KİŞİSEL ABAP BİLGİ BANKASI</p><h1>Notlarım</h1><p>Bir kategori seç veya bütün notlarında ara.</p></section>
+    <form method="get" asp-controller="Notes" asp-action="Index" class="search">
+       <input type="search" name="q" placeholder="Notlarda ara: VALUE #(, ?=, ALV, BAPI..." aria-label="Notlarda ara" />
+       <button type="submit">Ara</button>
+    </form>
+    <div class="row-between category-heading"><div><h2>Kategoriler</h2><p class="muted">@categories.Count kategori · @totalNotes not</p></div><a class="action" asp-action="Create">+ Yeni Not</a></div>
+    <div class="category-grid">
+    @for (var i = 0; i < categories.Count; i++)
+    {
+        var c = categories[i];
+        <a class="category-card" asp-action="Index" asp-route-category="@c.Id">
+            <span class="category-icon">@(new[] { "AB", "IT", "SQL", "OO", "ALV", "API", "FRM", "XLS", "DBG", "SAP", "PRJ" }[i % 11])</span>
+            <span class="category-text"><h3>@c.Name</h3><span class="category-count">@c.NoteCount not</span></span>
+            <span class="category-arrow">→</span>
+        </a>
+    }
+    </div>
+}
+else
+{
+    <section class="hero" style="padding-bottom:6px"><p class="eyebrow">ABAP NOTLARIM</p><h1>@(categoryName ?? "Arama sonuçları")@if (companyName is not null) { <span class="hero-sub"> › @companyName</span> }</h1><p>Soldan bir sayfa seç ve tam içeriğini oku.</p></section>
+    <form method="get" asp-action="Index" class="search">
+        <input type="search" name="q" value="@query" placeholder="Başlık, kod veya açıklama ara..." />
+        @if (selectedCategory.HasValue) { <input type="hidden" name="category" value="@selectedCategory" /> }
+        @if (selectedCompany.HasValue) { <input type="hidden" name="company" value="@selectedCompany" /> }
+        <button type="submit">Ara</button>
+    </form>
+    <div class="row-between"><a class="back-link" asp-action="Index">← Tüm kategoriler</a><a class="action" asp-action="Create" asp-route-category="@selectedCategory" asp-route-company="@selectedCompany">+ Yeni Not</a></div>
+    @* Üç kolon: soldan sağa kategoriler, sayfalar, not. *@
+    <div class="reading-layout">
+        <aside class="note-sidebar category-sidebar" aria-label="Kategoriler">
+           <div class="sidebar-top"><h2>Kategoriler</h2><span>@totalNotes not</span></div>
+           <nav class="note-list">
+           @foreach (var c in categories)
+           {
+               <a class="category-row @(c.Id == selectedCategory ? "active" : "")" asp-action="Index" asp-route-category="@c.Id">
+                   <span>@c.Name</span><span class="category-row-count">@c.NoteCount</span>
+               </a>
+               @* Projeler açıkken altında firmalar listelenir; her firmanın kendi sayfaları vardır. *@
+               if (c.Id == projectsId && selectedCategory == projectsId)
+               {
+                   foreach (var f in companies)
+                   {
+                       <a class="category-row company-row @(f.Id == selectedCompany ? "active" : "")" asp-action="Index" asp-route-category="@c.Id" asp-route-company="@f.Id">
+                           <span>@f.Name</span><span class="category-row-count">@f.NoteCount</span>
+                       </a>
+                   }
+                   <form asp-action="CreateCompany" method="post" class="company-add">
+                       @Html.AntiForgeryToken()
+                       <input name="name" placeholder="Yeni firma adı" maxlength="100" required aria-label="Yeni firma adı" />
+                       <button type="submit" title="Firma ekle">+</button>
+                   </form>
+               }
+           }
+           </nav>
+        </aside>
+        <aside class="note-sidebar" aria-label="Not sayfaları">
+           <div class="sidebar-top"><h2>@(companyName ?? "Sayfalar")</h2><span>@Model.Count sayfa</span>
+           @if (selectedCompany.HasValue)
+           {
+               @* Firma adı değiştirme ve (boşsa) silme *@
+               <details class="company-tools"><summary>Firma ayarları</summary>
+                   <form asp-action="RenameCompany" asp-route-id="@selectedCompany" method="post" class="company-add">
+                       @Html.AntiForgeryToken()
+                       <input name="name" value="@companyName" maxlength="100" required aria-label="Firma adı" />
+                       <button type="submit">Kaydet</button>
+                   </form>
+                   <form asp-action="DeleteCompany" asp-route-id="@selectedCompany" method="post" class="inline-form" onsubmit="return confirm('Firma silinsin mi? (Sadece sayfası olmayan firma silinebilir.)');">
+                       @Html.AntiForgeryToken()
+                       <button type="submit" class="danger-link">Firmayı sil</button>
+                   </form>
+               </details>
+           }
+           </div>
+           @if (canReorder && Model.Count > 1) { <div class="reorder-hint">Sıralamak için sayfaları sürükle</div> }
+           <nav class="note-list" data-reorder="@(canReorder ? "true" : "false")">
+           @if (canReorder) { @Html.AntiForgeryToken() }
+           @foreach (var n in Model)
+           {
+               <a class="note-row @(selectedNote?.Id == n.Id ? "active" : "")" draggable="@(canReorder ? "true" : "false")" data-id="@n.Id" asp-action="Index" asp-route-category="@selectedCategory" asp-route-q="@query" asp-route-company="@selectedCompany" asp-route-note="@n.Id">
+                   <div class="note-title">@n.Title</div>
+                   <div class="note-date">@n.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy")</div>
+               </a>
+           }
+           </nav>
+        </aside>
+        <article class="note-document">
+          @if (editing)
+          {
+              @* Düzenleme sağ panelde açılır; kaydet/vazgeç aynı sayfaya ve aynı nota döner. *@
+              ViewBag.CancelUrl = Url.Action("Index", new { category = selectedCategory, q = query, company = selectedCompany, note = selectedNote!.Id });
+              <div class="doc-top"><span class="doc-kicker">Notu düzenle</span></div>
+              <form asp-action="Edit" asp-route-id="@selectedNote.Id" method="post" class="form-card inline-edit">
+                  @Html.AntiForgeryToken()
+                  <input type="hidden" name="Id" value="@selectedNote.Id" />
+                  <input type="hidden" name="inline" value="true" />
+                  @if (selectedCategory.HasValue) { <input type="hidden" name="returnCategory" value="@selectedCategory" /> }
+                  @if (!string.IsNullOrWhiteSpace(query)) { <input type="hidden" name="returnQ" value="@query" /> }
+                  @if (selectedCompany.HasValue) { <input type="hidden" name="returnCompany" value="@selectedCompany" /> }
+                  <partial name="_Fields" model="selectedNote" />
+              </form>
+          }
+          else if (selectedNote is not null)
+          {
+              <div class="doc-top"><span class="doc-kicker">@selectedNote.Category?.Name@if (selectedNote.Company is not null) { <text> › @selectedNote.Company.Name</text> }</span><span><a asp-action="Index" asp-route-category="@selectedCategory" asp-route-q="@query" asp-route-company="@selectedCompany" asp-route-note="@selectedNote.Id" asp-route-edit="true">Düzenle</a><partial name="_DeleteForm" model="selectedNote" /></span></div>
+              <h2 class="doc-title">@selectedNote.Title</h2>
+              <div class="doc-date">Son düzenleme: @selectedNote.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+              <div class="doc-body"><partial name="_NoteBody" model="selectedNote" /></div>
+              @if (!string.IsNullOrWhiteSpace(selectedNote.Code))
+              {
+                  <h3>ABAP Kod Örneği</h3><pre class="doc-code"><code>@selectedNote.Code</code></pre>
+              }
+              @if (!string.IsNullOrWhiteSpace(selectedNote.Tags)) { <div class="doc-source">Etiketler: @selectedNote.Tags</div> }
+              @if (!string.IsNullOrWhiteSpace(selectedNote.SourceFile)) { <div class="doc-source">Kaynak: @selectedNote.SourceFile @if (selectedNote.SourcePage.HasValue) { <span> · Sayfa @selectedNote.SourcePage</span> }</div> }
+          }
+          else { <div class="reading-empty">@(companyName is not null ? "Bu firmada henüz sayfa yok. \"+ Yeni Not\" ile ekleyebilirsin." : "Bu kategori için henüz bir not bulunmuyor.")</div> }
+        </article>
+    </div>
+}

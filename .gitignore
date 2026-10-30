@@ -1,0 +1,24 @@
+# .NET derleme çıktıları
+bin/
+obj/
+*.user
+*.suo
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Kişisel not verisi: repo herkese açık, notlar asla commit edilmez.
+ImportData/*.json
+!ImportData/*.example.json
+ImportData/onenote/
+ImportData/yedek/
+
+# Yerel araç ayarları (makineye özel yollar içerir)
+.claude/
+
+# Diğer
+*.log
+Thumbs.db
+.DS_Store

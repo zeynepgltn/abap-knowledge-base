@@ -1,0 +1,2 @@
+@model Note
+<h1>Yeni ABAP Notu</h1><p class="muted">Notunu gir, kategoriyi önerelim, onaylayıp kaydet.</p><form asp-action="Create" method="post" class="form-card">@Html.AntiForgeryToken()<partial name="_Fields" model="Model" /></form>

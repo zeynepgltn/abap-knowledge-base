@@ -1,0 +1,11 @@
+@model Note
+@* Not silme butonu. Index'ten çağrılınca ViewBag.Query / ViewBag.SelectedCategory dolu olur,
+   silme sonrası kullanıcı aynı listeye döner. Details/Edit'te boş kalır, notun kategorisine dönülür. *@
+<form asp-controller="Notes" asp-action="Delete" asp-route-id="@Model.Id" method="post" class="inline-form"
+      onsubmit="return confirm('Bu not kalıcı olarak silinecek. Emin misin?');">
+    @Html.AntiForgeryToken()
+    @if (!string.IsNullOrWhiteSpace(ViewBag.Query as string)) { <input type="hidden" name="q" value="@ViewBag.Query" /> }
+    @if (ViewBag.SelectedCategory is int cat) { <input type="hidden" name="category" value="@cat" /> }
+    @if (ViewBag.SelectedCompany is int company) { <input type="hidden" name="company" value="@company" /> }
+    <button type="submit" class="danger-link">Sil</button>
+</form>

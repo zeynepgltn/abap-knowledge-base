@@ -1,0 +1,11 @@
+{
+  "_aciklama": "Kopyalayıp onenote-kategoriler.json adıyla kaydet. Anahtar: 'defter/bölüm/sayfa başlığı', 'defter/bölüm' veya 'defter/*'. Boş değer: kategori önericisi karar verir. 'Projeler' kategorisine giden sayfalarda bölüm adı firma olur.",
+
+  "abap-notlarim/TEMEL": "ABAP Temelleri",
+  "abap-notlarim/SQL": "SQL, CDS ve Dictionary",
+  "abap-notlarim/ALV": "ALV ve Ekran İşlemleri",
+  "abap-notlarim/SQL/Read Table": "Internal Table ve Modern ABAP",
+  "hatalar/*": "Debug ve Hatalar",
+  "karisik/*": "",
+  "projeler/*": "Projeler"
+}
