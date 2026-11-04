@@ -52,6 +52,19 @@ Notlar masaüstü OneNote'tan (resimler ve resimlerin OCR metni dahil) aktarıl�
 
    Mevcut notlar `ImportData/yedek/` altına JSON olarak yedeklenir, **veritabanı silinip yeniden kurulur** ve OneNote sayfaları eklenir.
 
+### Sadece eksikleri ekleme
+
+OneNote'a sonradan eklenen sayfaları, mevcut notlara dokunmadan almak için:
+
+```powershell
+dotnet run -- --import-onenote --add          # önizleme, veritabanına dokunmaz
+dotnet run -- --import-onenote --add --apply  # eksikleri ekler
+```
+
+Var olan notlar, sıralamalar ve firmalar değişmez; yeni sayfalar kategorilerinin sonuna eklenir. Projeler kategorisine giden sayfalar bu modda eklenmez. Birebir aynı başlık ve içeriğe sahip sayfalar ikinci kez eklenmez. OneNote'ta sonradan değişen sayfaların üzerine yazılmaz, önizlemede listelenir (içi boş olan notlar doldurulur).
+
+Eşlemede `"__ATLA__"` değeri o sayfa, bölüm veya bölüm grubunu (`"defter/grup/*"`) tamamen dışarıda bırakır.
+
 Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resim:N]` satırı notun N. resmi olarak gösterilir.
 
 ## PDF notlarını içe aktarma (eski yöntem)

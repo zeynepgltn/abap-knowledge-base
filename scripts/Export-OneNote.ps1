@@ -33,6 +33,7 @@ foreach ($nb in $doc.SelectNodes('//one:Notebook', $ns)) {
         $groups = @()
         $parent = $section.ParentNode
         while ($parent.LocalName -eq 'SectionGroup') { $groups = @($parent.name) + $groups; $parent = $parent.ParentNode }
+        if ($groups -contains 'OneNote_RecycleBin') { continue }
         $order = 0
         foreach ($page in $section.SelectNodes('one:Page', $ns)) {
             if ($page.isInRecycleBin -eq 'true') { continue }

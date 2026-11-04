@@ -43,6 +43,7 @@ if (args.Contains("--import-notes"))
 }
 
 // OneNote aktarımı: --import-onenote önizleme yazar, --apply ile notlar yedeklenip veritabanı OneNote'tan yeniden kurulur.
+// --add ile sadece eksik sayfalar bulunur; --add --apply bunları mevcut notlara dokunmadan ekler.
 if (args.Contains("--import-onenote"))
 {
     using var scope = app.Services.CreateScope();
@@ -50,7 +51,8 @@ if (args.Contains("--import-onenote"))
         scope.ServiceProvider.GetRequiredService<NotesDbContext>(),
         scope.ServiceProvider.GetRequiredService<ClassificationService>(),
         Path.Combine(app.Environment.ContentRootPath, "ImportData"),
-        apply: args.Contains("--apply"));
+        apply: args.Contains("--apply"),
+        add: args.Contains("--add"));
     return;
 }
 

@@ -15,6 +15,8 @@ namespace ABAPKnowledgeBase.ImportData;
 /// scripts/Export-OneNote.ps1 ile dışa aktarılan OneNote sayfalarını notlara çevirir.
 /// Varsayılan: sadece önizleme yazar (onizleme.md), veritabanına dokunmaz.
 /// apply=true: mevcut notları yedekler, veritabanını sıfırdan kurar ve OneNote notlarını ekler.
+/// add=true: veritabanına dokunmadan sadece eksik sayfaları bulur; apply ile birlikte bunları ekler.
+/// Bu modda var olan notlar, sıralar ve firmalar değişmez; Projeler kategorisine giden sayfalar eklenmez.
 /// </summary>
 public static partial class OneNoteImporter
 {
@@ -33,7 +35,10 @@ public static partial class OneNoteImporter
 
     private sealed record Planned(PageInfo Page, Note Note, string Category, string Method);
 
-    public static async Task RunAsync(NotesDbContext db, ClassificationService classifier, string importDir, bool apply)
+    // Eşleme dosyasında bu değer, sayfanın/bölümün hiç aktarılmayacağı anlamına gelir.
+    private const string SkipMarker = "__ATLA__";
+
+    public static async Task RunAsync(NotesDbContext db, ClassificationService classifier, string importDir, bool apply, bool add = false)
     {
         var exportDir = Path.Combine(importDir, "onenote");
         var manifestPath = Path.Combine(exportDir, "manifest.json");
@@ -48,7 +53,14 @@ public static partial class OneNoteImporter
             throw new FileNotFoundException("Kategori eşlemesi yok: onenote-kategoriler.example.json dosyasını onenote-kategoriler.json adıyla kopyalayıp düzenle", mappingPath);
         var mapping = JsonSerializer.Deserialize<Dictionary<string, string>>(await File.ReadAllTextAsync(mappingPath)) ?? [];
 
-        var planned = pages.Select(p => Plan(p, exportDir, mapping, classifier)).ToList();
+        var skipped = pages.Where(p => Lookup(p, mapping).Value == SkipMarker).ToList();
+        foreach (var g in skipped.GroupBy(p => p.Notebook)) Console.WriteLine($"Atlanan: {g.Key} - {g.Count()} sayfa");
+        var planned = pages.Except(skipped).Select(p => Plan(p, exportDir, mapping, classifier)).ToList();
+        if (add)
+        {
+            await AddMissingAsync(db, planned, Path.Combine(importDir, "yedek"), Path.Combine(exportDir, "onizleme.md"), apply);
+            return;
+        }
         await WritePreviewAsync(planned, Path.Combine(exportDir, "onizleme.md"));
 
         foreach (var g in planned.GroupBy(p => p.Category).OrderByDescending(g => g.Count()))
@@ -95,18 +107,113 @@ public static partial class OneNoteImporter
         var note = Convert(page, Path.Combine(exportDir, page.File));
         var section = string.IsNullOrEmpty(page.SectionGroups) ? page.Section : $"{page.SectionGroups}/{page.Section}";
         string? category = null, method;
+        var (key, value) = Lookup(page, mapping);
         var ocr = string.Join(' ', note.Images.Select(i => i.OcrText));
         var best = classifier.Suggest($"{note.Title} {note.Body} {ocr}").FirstOrDefault();
-        // Öncelik: tek sayfa ("defter/bölüm/başlık") > bölüm ("defter/bölüm") > defter ("defter/*") > sınıflandırıcı.
-        if (mapping.TryGetValue($"{page.Notebook}/{section}/{page.Title.Trim()}", out var c) && c != "") { category = c; method = "sayfa"; }
-        else if (mapping.TryGetValue($"{page.Notebook}/{section}", out c) && c != "") { category = c; method = "bölüm"; }
-        else if (mapping.TryGetValue($"{page.Notebook}/*", out c) && c != "") { category = c; method = "defter"; }
+        if (!string.IsNullOrEmpty(value))
+        {
+            category = value;
+            method = !key!.EndsWith("/*") ? (key == $"{page.Notebook}/{section}" ? "bölüm" : "sayfa") : key == $"{page.Notebook}/*" ? "defter" : "grup";
+        }
         else if (best.Category is not null) { category = best.Category; method = $"öneri: {best.Evidence}"; }
         else method = "VARSAYILAN (öneri yok)";
         // Eşleme ile içerik güçlü biçimde çelişiyorsa önizlemede işaretle; karar kullanıcının.
-        if (category is not null && method is "bölüm" or "defter" && best.Category is not null && best.Category != category && best.Score >= 6)
+        if (category is not null && method is "bölüm" or "grup" or "defter" && best.Category is not null && best.Category != category && best.Score >= 6)
             method += $" ⚠ içerik: {best.Category} ({best.Evidence})";
         return new Planned(page, note, category ?? "ABAP Temelleri", method);
+    }
+
+    // Eşlemede bu sayfa için geçerli ilk kayıt: tek sayfa ("defter/bölüm/başlık") > bölüm ("defter/bölüm") >
+    // bölüm grubu ("defter/grup/*") > defter ("defter/*"). Boş değer: kategoriyi sınıflandırıcı seçer.
+    private static (string? Key, string? Value) Lookup(PageInfo page, Dictionary<string, string> mapping)
+    {
+        var section = string.IsNullOrEmpty(page.SectionGroups) ? page.Section : $"{page.SectionGroups}/{page.Section}";
+        var keys = new List<string> { $"{page.Notebook}/{section}/{page.Title.Trim()}", $"{page.Notebook}/{section}" };
+        var groups = page.SectionGroups.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = groups.Length; i > 0; i--) keys.Add($"{page.Notebook}/{string.Join('/', groups[..i])}/*");
+        keys.Add($"{page.Notebook}/*");
+        foreach (var key in keys)
+            if (mapping.TryGetValue(key, out var value)) return (key, value);
+        return (null, null);
+    }
+
+    // ---------- Sadece eksikleri ekleme ----------
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhiteSpace();
+    private static string Normalized(string? body) => WhiteSpace().Replace(body ?? "", " ").Trim();
+
+    private static async Task AddMissingAsync(NotesDbContext db, List<Planned> planned, string backupDir, string previewPath, bool apply)
+    {
+        var existing = await db.Notes.AsNoTracking().Select(n => new { n.Id, n.Title, n.Body, n.SourceFile, n.UpdatedAt }).ToListAsync();
+        var bySource = existing.GroupBy(n => $"{n.SourceFile}|{n.Title.Trim()}").ToDictionary(g => g.Key, g => g.ToList());
+        var known = existing.Select(n => $"{n.Title.Trim()}|{Normalized(n.Body)}").ToHashSet();
+
+        List<Planned> missing = [], changed = [];
+        // Bizde içi boş olan ama OneNote'ta sonradan doldurulan sayfalar: kaybedilecek bir şey olmadığı için doldurulur.
+        var fill = new List<(int Id, Planned Page)>();
+        int same = 0, duplicates = 0, projects = 0;
+        foreach (var p in planned)
+        {
+            if (p.Category == CategorySeed.Projects) { projects++; continue; }
+            var body = Normalized(p.Note.Body);
+            if (bySource.TryGetValue($"{p.Note.SourceFile}|{p.Note.Title.Trim()}", out var rows) && rows.Count > 0)
+            {
+                // Aynı bölümde aynı başlıkta birden çok sayfa olabilir: önce içeriği aynı olanla eşleştir.
+                var match = rows.FirstOrDefault(r => Normalized(r.Body) == body);
+                if (match is not null) { rows.Remove(match); same++; continue; }
+                match = rows[0]; rows.RemoveAt(0);
+                // OneNote'ta sonradan değişen sayfa üzerine yazılmaz, sadece raporlanır (notta elle düzenleme olabilir).
+                if (string.IsNullOrWhiteSpace(match.Body)) fill.Add((match.Id, p));
+                else if (p.Note.UpdatedAt > match.UpdatedAt) changed.Add(p);
+                else same++;
+                continue;
+            }
+            // Başlıksız ve içeriksiz boş sayfalar eklenmez.
+            if (body == "" && p.Note.Images.Count == 0) continue;
+            // Başka bölümde birebir aynı başlık+içerik varsa aynı not iki kere eklenmez.
+            if (!known.Add($"{p.Note.Title.Trim()}|{body}")) { duplicates++; continue; }
+            missing.Add(p);
+        }
+
+        var sb = new StringBuilder("# Eksik sayfalar\n\n| # | Defter / Bölüm | Başlık | Kategori | Neden | Resim | Karakter |\n|---|---|---|---|---|---|---|\n");
+        var i = 0;
+        foreach (var p in missing)
+            sb.Append($"| {++i} | {p.Page.Notebook} / {p.Page.SectionGroups} / {p.Page.Section} | {p.Note.Title.Replace("|", "/")} | {p.Category} | {p.Method.Replace("|", "/")} | {p.Note.Images.Count} | {p.Note.Body.Length} |\n");
+        sb.Append("\n# OneNote'ta sonradan değişen sayfalar (üzerine yazılmadı)\n\n");
+        foreach (var p in changed) sb.Append($"- {p.Page.Notebook} / {p.Page.Section} / {p.Note.Title}\n");
+        await File.WriteAllTextAsync(previewPath, sb.ToString());
+
+        foreach (var g in missing.GroupBy(p => p.Category).OrderByDescending(g => g.Count()))
+            Console.WriteLine($"{g.Count(),4}  {g.Key}");
+        Console.WriteLine($"Eksik: {missing.Count} sayfa, {missing.Sum(p => p.Note.Images.Count)} resim. Zaten var: {same}. Doldurulacak boş not: {fill.Count}. Kopya: {duplicates}. Proje (eklenmedi): {projects}. OneNote'ta değişmiş: {changed.Count}.");
+        Console.WriteLine($"Önizleme: {previewPath}");
+        if (!apply)
+        {
+            Console.WriteLine("Önizleme modu: veritabanı değiştirilmedi. Eklemek için --apply de ekle.");
+            return;
+        }
+
+        Console.WriteLine($"Mevcut notlar yedeklendi: {await BackupAsync(db, backupDir)}");
+        var categories = await db.Categories.ToDictionaryAsync(c => c.Name, c => c.Id);
+        // Yeni sayfalar kategorilerinin sonuna, OneNote sırasıyla eklenir; mevcut sıra değişmez.
+        var maxOrder = await db.Notes.GroupBy(n => n.CategoryId).Select(g => new { g.Key, Max = g.Max(n => n.SortOrder) }).ToDictionaryAsync(x => x.Key, x => x.Max);
+        foreach (var p in missing)
+        {
+            var categoryId = categories[p.Category];
+            p.Note.CategoryId = categoryId;
+            p.Note.SortOrder = maxOrder[categoryId] = maxOrder.GetValueOrDefault(categoryId) + 1;
+            db.Notes.Add(p.Note);
+        }
+        foreach (var (id, p) in fill)
+        {
+            var note = await db.Notes.Include(n => n.Images).FirstAsync(n => n.Id == id);
+            note.Body = p.Note.Body;
+            note.UpdatedAt = p.Note.UpdatedAt;
+            note.Images = p.Note.Images;
+        }
+        await db.SaveChangesAsync();
+        Console.WriteLine($"Eklenen not: {missing.Count}. Doldurulan boş not: {fill.Count}.");
     }
 
     // ---------- OneNote sayfa XML'i -> Note ----------
