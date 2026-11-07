@@ -35,6 +35,8 @@
     --success-bg: #ecfdf3;
     --success-border: #abefc6;
     --success-text: #085d3a;
+    --mark-bg: #fde68a;
+    --mark-text: #3b2f00;
     --radius: 12px;
 }
 
@@ -73,6 +75,8 @@
         --success-bg: #0f2619;
         --success-border: #1e5236;
         --success-text: #75e0a7;
+    --mark-bg: #6b551c;
+    --mark-text: #fff4cc;
     }
 }
 
@@ -109,6 +113,8 @@
     --success-bg: #0f2619;
     --success-border: #1e5236;
     --success-text: #75e0a7;
+    --mark-bg: #6b551c;
+    --mark-text: #fff4cc;
 }
 
 *,
@@ -694,6 +700,77 @@ button.suggest:hover {
 
 .inline-edit textarea[name="Body"] {
     min-height: 55vh;
+}
+
+/* Arama: filtreler, pasaj ve vurgu */
+mark {
+    background: var(--mark-bg);
+    color: var(--mark-text);
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+.facets {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: -12px 0 18px;
+}
+
+.facet-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.facet-label {
+    min-width: 64px;
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.chip {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.chip b {
+    margin-left: 4px;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.chip.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+}
+
+.note-snippet {
+    margin-top: 4px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.snippet-where {
+    font-weight: 600;
+    color: var(--accent);
 }
 
 /* Sayfa sıralama (sürükle-bırak) */

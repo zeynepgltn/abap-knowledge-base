@@ -42,6 +42,28 @@ document.addEventListener('DOMContentLoaded',()=>{
    }catch{alert('Sıralama kaydedilemedi; sayfa yenilenecek.');location.reload();}
   });
  }
+ // Arama sonucunda açılan notta aranan ifade işaretlenir ve ilk eşleşmeye kaydırılır.
+ // İfade bir arada geçmiyorsa kelimeler ayrı ayrı işaretlenir.
+ const docBody=document.querySelector('.doc-body[data-highlight]');
+ const query=docBody?.dataset.highlight.trim();
+ if(query){
+  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const mark=pattern=>{
+   const rx=new RegExp(pattern,'gi'), nodes=[], walker=document.createTreeWalker(docBody,NodeFilter.SHOW_TEXT);
+   while(walker.nextNode()){rx.lastIndex=0; if(rx.test(walker.currentNode.nodeValue))nodes.push(walker.currentNode);}
+   for(const node of nodes){
+    const frag=document.createDocumentFragment(); let last=0; const text=node.nodeValue; rx.lastIndex=0;
+    for(let m;(m=rx.exec(text));){
+     if(!m[0].length){rx.lastIndex++;continue;}
+     frag.append(text.slice(last,m.index)); const el=document.createElement('mark'); el.className='hl'; el.textContent=m[0]; frag.append(el); last=m.index+m[0].length;
+    }
+    frag.append(text.slice(last)); node.replaceWith(frag);
+   }
+   return nodes.length>0;
+  };
+  if(!mark(esc(query))){const words=query.split(/\s+/).filter(w=>w.length>1); if(words.length>1)mark(words.map(esc).join('|'));}
+  docBody.querySelector('mark.hl')?.scrollIntoView({block:'center'});
+ }
  // Firma alanı sadece Projeler kategorisi seçiliyken gösterilir.
  const categorySelect=document.querySelector('#CategoryId'), companyField=document.querySelector('#companyField');
  if(categorySelect&&companyField){

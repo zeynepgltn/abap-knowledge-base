@@ -88,7 +88,8 @@ dotnet run -- --import-notes
 - OneNote'tan resimleriyle aktarım; resimlerdeki yazıda (OCR) arama
 - Açık / koyu tema
 - 10 ABAP kategorisi + Projeler; ABAP terimlerine dayalı kategori önerisi (tam kelime eşleşmesi, ağırlıklı puan, kullanıcı onaylı)
-- Teknik sembolleri de (`?=`, `VALUE #(`) arayan literal arama
+- Teknik sembolleri de (`?=`, `VALUE #(`) arayan arama: en ilgili sonuç üstte (başlık > etiket > kod > metin > resimdeki yazı), her sonuçta vurgulu pasaj, kategori ve etiket filtreleri; açılan notta eşleşmeler işaretlenir
+- Arama kabul testi: uygulama açıkken `powershell -ExecutionPolicy Bypass -File scripts\Test-Search.ps1` → `tests/arama-testleri.json`'daki sorgularda beklenen not ilk 5'te mi ölçer
 - Kaynak dosya adı ve sayfa numarası kaydı
 - 404 / hata durumunda uygulamanın kendi hata sayfası
 

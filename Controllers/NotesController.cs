@@ -8,8 +8,10 @@ namespace ABAPKnowledgeBase.Controllers;
 public class NotesController(NotesDbContext db, ClassificationService classifier) : Controller {
  // edit=true: seçili not sağ panelde düzenleme formuyla açılır.
  // company: Projeler kategorisinde sadece o firmanın sayfaları listelenir.
- public async Task<IActionResult> Index(string? q, int? category, int? note, int? company, bool edit = false) {
+ // tag: arama sonuçlarını bir etikete (OneNote bölümüne) daraltır.
+ public async Task<IActionResult> Index(string? q, int? category, int? note, int? company, string? tag, bool edit = false) {
   ViewBag.Edit = edit;
+  ViewBag.SelectedTag = tag;
   if (edit) await LoadCategories();
   // category=0 "kategori yok" demektir; filtre ve görünüm aynı değeri kullansın.
   if (category is <= 0) category = null;
@@ -35,20 +37,46 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   ViewBag.CompanyName = company is null ? null : (ViewBag.Companies as List<CategoryOverview>)!.FirstOrDefault(c => c.Id == company)?.Name;
   if (company.HasValue && ViewBag.CompanyName is null) return NotFound();
   var notes = db.Notes.Include(n => n.Category).Include(n => n.Company).AsQueryable();
-  if (category.HasValue) notes = notes.Where(n => n.CategoryId == category.Value);
   if (company.HasValue) notes = notes.Where(n => n.CompanyId == company.Value);
-  if (!string.IsNullOrWhiteSpace(q)) {
-   var term = q.Trim();
-   notes = notes.Where(n => n.Title.Contains(term) || n.Body.Contains(term) ||
-       (n.Code != null && n.Code.Contains(term)) || (n.Tags != null && n.Tags.Contains(term)) ||
-       n.Images.Any(i => i.OcrText != null && i.OcrText.Contains(term)));
+  if (!string.IsNullOrWhiteSpace(q)) return View(await Search(notes, q, category, tag));
+  if (!category.HasValue) return View(new List<Note>());
+  // Kategori listesi elle verilen sırada gösterilir ve sürüklenerek sıralanabilir.
+  ViewBag.CanReorder = true;
+  notes = notes.Where(n => n.CategoryId == category.Value).OrderBy(n => n.SortOrder).ThenBy(n => n.Id);
+  return View(await notes.Take(1000).ToListAsync());
+ }
+
+ // Arama: aday notları veritabanı bulur (her kelime başlık, metin, kod, etiket veya resimdeki yazıda geçmeli),
+ // NoteSearch puanlayıp pasaj çıkarır. Kategori/etiket sayıları filtre uygulanmadan önce hesaplanır ki
+ // sonuçlar daraltıldığında diğer seçenekler de görünsün.
+ private async Task<List<Note>> Search(IQueryable<Note> notes, string q, int? category, string? tag) {
+  var term = q.Trim();
+  foreach (var word in NoteSearch.Words(term)) {
+   var w = word;
+   notes = notes.Where(n => n.Title.Contains(w) || n.Body.Contains(w) ||
+       (n.Code != null && n.Code.Contains(w)) || (n.Tags != null && n.Tags.Contains(w)) ||
+       n.Images.Any(i => i.OcrText != null && i.OcrText.Contains(w)));
   }
-  if (!category.HasValue && string.IsNullOrWhiteSpace(q)) return View(new List<Note>());
-  // Kategori listesi elle verilen sırada gösterilir ve sürüklenerek sıralanabilir; arama sonuçları en yeni üstte.
-  var searching = !string.IsNullOrWhiteSpace(q);
-  ViewBag.CanReorder = !searching;
-  notes = searching ? notes.OrderByDescending(n => n.UpdatedAt) : notes.OrderBy(n => n.SortOrder).ThenBy(n => n.Id);
-  return View(await notes.Take(searching ? 200 : 1000).ToListAsync());
+  var candidates = await notes.Take(1000).ToListAsync();
+  var ids = candidates.Select(n => n.Id).ToList();
+  var ocr = (await db.NoteImages.Where(i => ids.Contains(i.NoteId) && i.OcrText != null)
+    .Select(i => new { i.NoteId, i.OcrText }).ToListAsync())
+   .GroupBy(i => i.NoteId).ToDictionary(g => g.Key, g => string.Join(" ", g.Select(i => i.OcrText)));
+  var hits = NoteSearch.Rank(candidates, term, ocr);
+
+  ViewBag.ResultTotal = hits.Count;
+  ViewBag.CategoryFacets = hits.GroupBy(h => h.Note.Category!)
+   .Select(g => new CategoryOverview { Id = g.Key.Id, Name = g.Key.Name, NoteCount = g.Count() })
+   .OrderByDescending(f => f.NoteCount).ToList();
+  if (category.HasValue) hits = hits.Where(h => h.Note.CategoryId == category.Value).ToList();
+  ViewBag.TagFacets = hits.SelectMany(h => NoteSearch.TagsOf(h.Note)).GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+   .Select(g => (Tag: g.Key, Count: g.Count())).OrderByDescending(t => t.Count).ThenBy(t => t.Tag).Take(15).ToList();
+  if (!string.IsNullOrWhiteSpace(tag))
+   hits = hits.Where(h => NoteSearch.TagsOf(h.Note).Contains(tag, StringComparer.OrdinalIgnoreCase)).ToList();
+
+  ViewBag.ResultCount = hits.Count;
+  ViewBag.SearchHits = hits.Take(200).ToDictionary(h => h.Note.Id);
+  return hits.Take(200).Select(h => h.Note).ToList();
  }
  public async Task<IActionResult> Details(int id) {
   var note=await db.Notes.Include(n=>n.Category).Include(n=>n.Company).FirstOrDefaultAsync(n=>n.Id==id);
