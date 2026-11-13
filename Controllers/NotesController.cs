@@ -29,8 +29,10 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   if (category.HasValue && ViewBag.CategoryName is null) return NotFound();
   var projectsId = categories.FirstOrDefault(c => c.Name == CategorySeed.Projects)?.Id;
   ViewBag.ProjectsCategoryId = projectsId;
-  ViewBag.Companies = await db.Companies.OrderBy(c => c.Name)
-   .Select(c => new CategoryOverview { Id = c.Id, Name = c.Name, NoteCount = c.Notes.Count }).ToListAsync();
+  // Firma adları Türkçe alfabe sırasıyla (Ç, Ş, Ü... doğru yerde) bellekte sıralanır; SQLite ikili sıralar.
+  ViewBag.Companies = (await db.Companies
+   .Select(c => new CategoryOverview { Id = c.Id, Name = c.Name, NoteCount = c.Notes.Count }).ToListAsync())
+   .OrderBy(c => c.Name, TurkishOrder).ToList();
   // Firma sadece Projeler kategorisinde anlamlıdır.
   if (category != projectsId) company = null;
   ViewBag.SelectedCompany = company;
@@ -53,9 +55,10 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   var term = q.Trim();
   foreach (var word in NoteSearch.Words(term)) {
    var w = word;
-   notes = notes.Where(n => n.Title.Contains(w) || n.Body.Contains(w) ||
-       (n.Code != null && n.Code.Contains(w)) || (n.Tags != null && n.Tags.Contains(w)) ||
-       n.Images.Any(i => i.OcrText != null && i.OcrText.Contains(w)));
+   // TextMatch.Contains: büyük/küçük harf ve İ/ı farkı gözetmez (SQLite'ta tr_contains).
+   notes = notes.Where(n => TextMatch.Contains(n.Title, w) || TextMatch.Contains(n.Body, w) ||
+       TextMatch.Contains(n.Code, w) || TextMatch.Contains(n.Tags, w) ||
+       n.Images.Any(i => TextMatch.Contains(i.OcrText, w)));
   }
   var candidates = await notes.Take(1000).ToListAsync();
   var ids = candidates.Select(n => n.Id).ToList();
@@ -206,9 +209,10 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
 
  private async Task LoadCategories() {
   ViewBag.CategoryItems=new SelectList(await db.Categories.OrderBy(c=>c.Id).ToListAsync(),"Id","Name");
-  ViewBag.CompanyItems=new SelectList(await db.Companies.OrderBy(c=>c.Name).ToListAsync(),"Id","Name");
+  ViewBag.CompanyItems=new SelectList((await db.Companies.ToListAsync()).OrderBy(c=>c.Name, TurkishOrder),"Id","Name");
   ViewBag.ProjectsCategoryId=await ProjectsId();
  }
+ private static readonly StringComparer TurkishOrder = StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), ignoreCase: true);
  private async Task<int> NextSortOrder(int categoryId) => (await db.Notes.Where(n => n.CategoryId == categoryId).MaxAsync(n => (int?)n.SortOrder) ?? 0) + 1;
  private async Task<int?> ProjectsId() => await db.Categories.Where(c => c.Name == CategorySeed.Projects).Select(c => (int?)c.Id).FirstOrDefaultAsync();
  // Firma sadece Projeler kategorisinde tutulur; başka kategoride gelen firma bilgisi atılır.

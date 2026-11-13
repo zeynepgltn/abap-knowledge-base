@@ -7,6 +7,8 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
  public DbSet<NoteImage> NoteImages => Set<NoteImage>();
  public DbSet<Company> Companies => Set<Company>();
  protected override void OnModelCreating(ModelBuilder modelBuilder) {
+   // Aramada Türkçe uyumlu, büyük/küçük harf duyarsız "içinde geçiyor mu" (bkz. SqliteSetup.cs).
+   modelBuilder.HasDbFunction(typeof(TextMatch).GetMethod(nameof(TextMatch.Contains))!).HasName("tr_contains");
    modelBuilder.Entity<Note>().HasOne(x=>x.Category).WithMany(x=>x.Notes).HasForeignKey(x=>x.CategoryId).OnDelete(DeleteBehavior.Restrict);
    modelBuilder.Entity<Note>().HasIndex(x=>x.Title);
    modelBuilder.Entity<Note>().HasIndex(x=>new{x.CategoryId,x.SortOrder});

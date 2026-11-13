@@ -38,7 +38,7 @@ public static partial class OneNoteImporter
     // Eşleme dosyasında bu değer, sayfanın/bölümün hiç aktarılmayacağı anlamına gelir.
     private const string SkipMarker = "__ATLA__";
 
-    public static async Task RunAsync(NotesDbContext db, ClassificationService classifier, string importDir, bool apply, bool add = false)
+    public static async Task RunAsync(NotesDbContext db, ClassificationService classifier, string importDir, bool apply, bool add = false, bool force = false)
     {
         var exportDir = Path.Combine(importDir, "onenote");
         var manifestPath = Path.Combine(exportDir, "manifest.json");
@@ -70,6 +70,16 @@ public static partial class OneNoteImporter
         if (!apply)
         {
             Console.WriteLine("Önizleme modu: veritabanı değiştirilmedi. Uygulamak için --apply ekle.");
+            return;
+        }
+
+        // Tam aktarım veritabanını SİLİP OneNote'tan yeniden kurar. Notlar artık doğrudan uygulamaya
+        // yazıldığı için bu, OneNote'ta olmayan notları kaybettirir; korumalar:
+        var ownNotes = await db.Notes.CountAsync(n => n.SourceFile == null || !n.SourceFile.StartsWith("OneNote:"));
+        if (ownNotes > 0 && !force)
+        {
+            Console.WriteLine($"Veritabanında OneNote'tan gelmeyen {ownNotes} not var (uygulamada yazılmış). Tam aktarım bunları SİLER.");
+            Console.WriteLine("Sadece eksik sayfaları eklemek için: --import-onenote --add --apply. Yine de silmek istiyorsan --force ekle.");
             return;
         }
 

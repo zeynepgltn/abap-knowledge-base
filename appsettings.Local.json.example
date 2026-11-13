@@ -1,0 +1,8 @@
+{
+  // İsteğe bağlı. Bu dosyayı "appsettings.Local.json" adıyla kopyala; git'e girmez.
+  // Normalde gerekmez: veritabanı %LOCALAPPDATA%\ABAPKnowledgeBase\abap-notlar.db içinde durur.
+  // Veritabanı dosyası OneDrive klasörüne KONMAMALI (açıkken senkronlanırsa bozulabilir).
+  "Database": {
+    "Path": "D:\\Notlar\\abap-notlar.db"
+  }
+}

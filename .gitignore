@@ -15,6 +15,13 @@ ImportData/*.json
 ImportData/onenote/
 ImportData/yedek/
 
+# Günlük veritabanı yedekleri: kişisel veri, repo'ya girmez.
+Backups/
+
+# Makineye özel ayarlar (ör. veritabanı yolu): repo'ya girmez.
+appsettings.Local.json
+appsettings.Development.json
+
 # Yerel araç ayarları (makineye özel yollar içerir)
 .claude/
 

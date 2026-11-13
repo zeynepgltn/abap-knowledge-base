@@ -2,26 +2,21 @@
 
 **Amaç:** Notu yaz → kategori önerisi al → elle onaylayıp kaydet → başlık/açıklama/kod/etikette ara.
 
-ASP.NET Core MVC (.NET 10) + Entity Framework Core + SQL Server.
+ASP.NET Core MVC (.NET 10) + Entity Framework Core + SQLite. Yedekler OneDrive'a gider.
 
 ## Kurulum (Windows)
 
-1. [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) yükle.
-2. SQL Server Express kur. Varsayılan bağlantı `appsettings.json` içinde:
-
-   ```json
-   "Default": "Server=.\\SQLEXPRESS;Database=ABAPKnowledgeBase;Trusted_Connection=True;TrustServerCertificate=True"
-   ```
-
-   LocalDB kullanıyorsan `Server=(localdb)\\MSSQLLocalDB` yap; başka bir SQL Server'ın varsa `Server=` kısmını ona göre değiştir.
-3. Terminalde bu klasöre git ve çalıştır:
+1. [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) yükle. Başka bir şey kurmak gerekmez (veritabanı SQLite, uygulamayla birlikte gelir).
+2. Terminalde bu klasöre git ve çalıştır:
 
    ```powershell
    dotnet restore
    dotnet run --urls "http://localhost:5168"
    ```
 
-4. Tarayıcıda **http://localhost:5168** adresine gir. Uygulama ilk çalıştırmada veritabanını ve 11 kategoriyi (10 ABAP konusu + Projeler) oluşturur.
+3. Tarayıcıda **http://localhost:5168** adresine gir. Uygulama ilk çalıştırmada veritabanını ve 11 kategoriyi (10 ABAP konusu + Projeler) oluşturur.
+
+Veritabanı tek bir dosyadır: `%LOCALAPPDATA%\ABAPKnowledgeBase\abap-notlar.db`. Yeri değiştirilecekse `appsettings.Local.json.example` dosyasına bak. Bu dosya OneDrive klasörüne konmamalı: açıkken senkronlanırsa bozulabilir. OneDrive'a sadece yedekler gider.
 
 > **Not verisi bu repoda yok.** Notlar, resimler, yedekler ve içe aktarma çıktıları kişisel olduğu için `.gitignore` ile dışarıda tutulur; uygulama boş bir veritabanıyla başlar.
 
@@ -92,12 +87,74 @@ dotnet run -- --import-notes
 - Arama kabul testi: uygulama açıkken `powershell -ExecutionPolicy Bypass -File scripts\Test-Search.ps1` → `tests/arama-testleri.json`'daki sorgularda beklenen not ilk 5'te mi ölçer
 - Kaynak dosya adı ve sayfa numarası kaydı
 - 404 / hata durumunda uygulamanın kendi hata sayfası
+- Otomatik yedek: günlük + not kaydedince + kapanışta; son 14 gün yerelde ve OneDrive'da; iki bilgisayar arasında otomatik aktarım
+
+## Yedekleme ve iki bilgisayar
+
+OneNote'tan aktarım bitince notlar **doğrudan bu siteye** yazılacak; veritabanı notların tek kopyası olur. Site iki bilgisayarda kullanılıyor ama **asla aynı anda açık olmuyor**. Buna göre:
+
+| Konu | Seçim | Neden |
+|---|---|---|
+| Veritabanı | **SQLite**, her bilgisayarda yerel tek dosya | Kurulum yok, internetsiz çalışır. Yedek = dosyanın kopyası, geri yükleme = dosyayı değiştirmek. Kişisel not uygulaması için SQL Server gereğinden ağırdı (her bilgisayara kurulum, servis izinleri). Bulut veritabanı (Azure SQL) ücretsiz katmanda bile abonelik ve fatura riski getirir; iki bilgisayar aynı anda açık olmadığı için gerek yok. |
+| Bulut | **OneDrive** | Windows'ta yerleşik, ek kurulum / API anahtarı yok. 5 GB ücretsiz alan 14 yedek için fazlasıyla yeter. Silinen dosya için geri dönüşüm kutusu ve sürüm geçmişi var. |
+
+### Nasıl çalışır
+
+- **Yedek ne zaman alınır:** her gün ilk açılışta, not kaydettikten 1 dk sonra (art arda kayıtlar tek yedek olur) ve site kapanırken (yedeklenmemiş değişiklik varsa).
+- **Nereye:** `Backups/ABAPKnowledgeBase-yyyyMMdd.db` ve OneDrive'da `ABAPKnowledgeBase-Yedekler/`. Günün dosyası gün içinde güncellenir; yerelde ve OneDrive'da **son 14 gün** tutulur. Her yedek kendi başına açılabilen tam bir SQLite veritabanıdır.
+- **Diğer bilgisayara geçince:** site açılırken OneDrive'daki `son-yedek.json` okunur. Diğer bilgisayar daha yeni yedek bıraktıysa önce o yedek buraya yüklenir, sonra site açılır. Kendiliğinden olur.
+- **İki tarafta da değişiklik varsa** (ör. bir bilgisayarda yedek OneDrive'a çıkmadan diğerinde not yazıldı): site hiçbir şeyi ezmeden açılmaz ve hangisinin kalacağını sorar:
+
+  ```powershell
+  dotnet run -- --restore-from-cloud   # diğer bilgisayarınki kalsın (buradakinin kopyası Backups\oncesi-... olarak saklanır)
+  dotnet run -- --keep-local           # bu bilgisayarınki kalsın (OneDrive'a yazılır)
+  ```
+
+- **OneDrive senkronu bitmemişse** site açılmaz, "henüz tam inmemiş" der. Birkaç dakika sonra tekrar aç.
+- **Boş veritabanı OneDrive'a hiç gönderilmez.** Yeni kurulmuş, henüz notu olmayan bir bilgisayar diğerinin yedeğini ezemez.
+- Yedek hatası siteyi durdurmaz, konsola yazılır.
+
+### Kurallar
+
+1. **Siteyi Ctrl+C ile kapat.** Kapanış yedeği bu sırada alınır ("pencereyi kapatma" yazısı görünür). Pencereyi X ile kapatırsan son 1 dakikadaki değişiklik bir sonraki açılışa kalabilir.
+2. **Geçmeden önce OneDrive'ın senkronladığından emin ol** (görev çubuğundaki OneDrive simgesi "güncel").
+3. Siteyi iki bilgisayarda aynı anda açma.
+
+### SQL Server'dan SQLite'a geçiş (bir kez, notların olduğu bilgisayarda)
+
+1. `git pull`
+2. `dotnet run`. SQLite boş olduğu ve bu bilgisayarda eski `.\SQLEXPRESS` veritabanı bulunduğu için notlar, firmalar ve resimler kendiliğinden SQLite'a kopyalanır. Konsolda her tablo için `SQL Server: N  SQLite: N ✓` satırları ve hemen ardından `Bulut kopyası çıkarıldı` görünür.
+3. Diğer bilgisayarda: OneDrive senkronlanınca `git pull` + `dotnet run` yap, notlar kendiliğinden gelir.
+
+SQL Server'daki veriye dokunulmaz (sadece okunur); bir şey ters giderse eski hâl orada durur. Aktarım elle de çalıştırılabilir: `dotnet run -- --import-sqlserver`. SQLite'ta not varsa ikinci kez aktarmaz. Kaynak bağlantı: `appsettings.json` → `ConnectionStrings:SqlServer`. Geçiş oturduktan sonra SQL Server kaldırılabilir.
+
+### Elle komutlar
+
+```powershell
+dotnet run -- --backup                     # hemen yedek al, OneDrive'a kopyala ve çık
+dotnet run -- --restore-from-cloud         # OneDrive'daki son yedeği yükle
+dotnet run -- --restore "C:\yol\ABAPKnowledgeBase-20261113.db"  # belirli bir günün yedeğini yükle
+```
+
+Bir yedeği yüklemeden önce mevcut veritabanının kopyası her zaman `Backups/oncesi-...db` olarak alınır.
+
+```json
+"Backup": { "Enabled": true, "KeepLastN": 14, "LocalFolder": "Backups", "CloudFolder": "", "CloudFolderName": "ABAPKnowledgeBase-Yedekler" }
+```
+
+`CloudFolder` boşsa OneDrive klasörü otomatik bulunur. Google Drive / Dropbox kullanacaksan senkron klasörün tam yolunu buraya yaz.
+
+### OneNote'tan geçiş
+
+OneNote'tan son aktarımı yaptıktan sonra `appsettings.json` → `"OneNote": { "ImportEnabled": false }` yap. Bundan sonra `--import-onenote` hiçbir şey yapmaz.
+
+Açık olsa bile tam aktarım (`--import-onenote --apply`, veritabanını silip OneNote'tan yeniden kurar), sitede yazılmış (OneNote'tan gelmeyen) not varsa durur; `--force` olmadan silmez. Eksikleri eklemek için `--add --apply` kullanılabilir. Veritabanına yazan her aktarımdan önce tam yedek alınır.
 
 ## Bilinçli sınırlamalar
 
 - Bu bir **yerel prototip**: **kullanıcı girişi yok, internete açma**.
 - Kategori seçimi otomatik kaydedilmez; önerinin butonuna basarak seçersin.
-- Arama SQL `LIKE` ile çalışır ve tek seferde en fazla 200 not gösterir. Not sayısı çok büyürse SQL Server Full-Text Search'e geçilmeli.
+- Arama her notta "içinde geçiyor mu" kontrolüyle çalışır (büyük/küçük harf ve İ/ı farkı gözetmez), en fazla 1000 aday not inceler. Not sayısı on binlere çıkarsa SQLite FTS5 tam metin aramasına geçilmeli.
 - Veritabanı şeması EF Core migration'larıyla (`Data/Migrations`) yönetilir ve uygulama açılırken otomatik güncellenir. Modele alan eklersen: `dotnet ef migrations add <Ad> --configuration Release --output-dir Data/Migrations` (araç `dotnet tool restore` ile kurulur; uygulama açıkken `bin/Debug` kilitli olduğu için Release kullanılır).
 - PDF'ten çıkarılan notlarda metin düzeni bozuk olabilir (sütunlar karışmış, kod `Code` yerine `Body` içinde).
 
