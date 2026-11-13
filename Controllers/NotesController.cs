@@ -36,7 +36,8 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   ViewBag.SelectedCompany = company;
   ViewBag.CompanyName = company is null ? null : (ViewBag.Companies as List<CategoryOverview>)!.FirstOrDefault(c => c.Id == company)?.Name;
   if (company.HasValue && ViewBag.CompanyName is null) return NotFound();
-  var notes = db.Notes.Include(n => n.Category).Include(n => n.Company).AsQueryable();
+  var notes = db.Notes.Include(n => n.Category).Include(n => n.Company).Include(n => n.Source)
+   .Include(n => n.NoteTags).ThenInclude(t => t.Tag).AsSplitQuery().AsQueryable();
   if (company.HasValue) notes = notes.Where(n => n.CompanyId == company.Value);
   if (!string.IsNullOrWhiteSpace(q)) return View(await Search(notes, q, category, tag));
   if (!category.HasValue) return View(new List<Note>());
@@ -54,7 +55,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   foreach (var word in NoteSearch.Words(term)) {
    var w = word;
    notes = notes.Where(n => n.Title.Contains(w) || n.Body.Contains(w) ||
-       (n.Code != null && n.Code.Contains(w)) || (n.Tags != null && n.Tags.Contains(w)) ||
+       (n.Code != null && n.Code.Contains(w)) || n.NoteTags.Any(t => t.Tag!.Name.Contains(w)) ||
        n.Images.Any(i => i.OcrText != null && i.OcrText.Contains(w)));
   }
   var candidates = await notes.Take(1000).ToListAsync();
@@ -79,7 +80,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   return hits.Take(200).Select(h => h.Note).ToList();
  }
  public async Task<IActionResult> Details(int id) {
-  var note=await db.Notes.Include(n=>n.Category).Include(n=>n.Company).FirstOrDefaultAsync(n=>n.Id==id);
+  var note=await db.Notes.Include(n=>n.Category).Include(n=>n.Company).Include(n=>n.Source).Include(n=>n.NoteTags).ThenInclude(t=>t.Tag).FirstOrDefaultAsync(n=>n.Id==id);
   return note is null?NotFound():View(note);
  }
  // Not gövdesindeki "[resim:N]" satırlarının gösterdiği resim.
@@ -95,16 +96,21 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
  }
  [HttpPost][ValidateAntiForgeryToken]
  // Sadece formdaki alanlar bağlanır: Id, CreatedAt gibi alanlar dışarıdan gönderilse bile yok sayılır.
- public async Task<IActionResult> Create([Bind(nameof(Note.Title), nameof(Note.Body), nameof(Note.Code), nameof(Note.Tags),
-   nameof(Note.CategoryId), nameof(Note.CompanyId), nameof(Note.SourceFile), nameof(Note.SourcePage))] Note note) {
+ public async Task<IActionResult> Create([Bind(nameof(Note.Title), nameof(Note.Body), nameof(Note.Code), nameof(Note.TagsText),
+   nameof(Note.CategoryId), nameof(Note.CompanyId), nameof(Note.SourceText), nameof(Note.SourcePage))] Note note) {
   if (!await db.Categories.AnyAsync(c=>c.Id==note.CategoryId)) ModelState.AddModelError(nameof(note.CategoryId),"Kategori seçmelisin");
   await CheckCompany(note);
   if (!ModelState.IsValid) { await LoadCategories(); return View(note); }
   note.CreatedAt=note.UpdatedAt=DateTime.UtcNow;
   note.SortOrder=await NextSortOrder(note.CategoryId);
+  (await NoteLinks.LoadAsync(db)).Apply(note,note.TagsText,note.SourceText);
   db.Notes.Add(note);await db.SaveChangesAsync();return RedirectToAction(nameof(Details),new{id=note.Id});
  }
- public async Task<IActionResult> Edit(int id) { var note=await db.Notes.FindAsync(id); if(note is null)return NotFound(); await LoadCategories(); return View(note); }
+ public async Task<IActionResult> Edit(int id) {
+  var note=await LoadForEdit(id); if(note is null)return NotFound();
+  NoteLinks.FillText(note); await LoadCategories(); return View(note);
+ }
+ private Task<Note?> LoadForEdit(int id) => db.Notes.Include(n=>n.Source).Include(n=>n.NoteTags).ThenInclude(t=>t.Tag).FirstOrDefaultAsync(n=>n.Id==id);
  [HttpPost][ValidateAntiForgeryToken]
  // inline=true: form okuma ekranının sağ panelinden geldi; kayıttan sonra aynı listeye ve nota dönülür.
  public async Task<IActionResult> Edit(int id,Note input,bool inline=false,int? returnCategory=null,string? returnQ=null,int? returnCompany=null) {
@@ -118,12 +124,14 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
     ViewBag.CancelUrl=Url.Action(nameof(Index),new{category=returnCategory,q=returnQ,company=returnCompany,note=id});}
    return View(input);
   }
-  var note=await db.Notes.FindAsync(id);if(note is null)return NotFound();
+  var note=await LoadForEdit(id);if(note is null)return NotFound();
   // Başka kategoriye taşınan not, yeni kategorisinin sonuna eklenir.
   if(note.CategoryId!=input.CategoryId)note.SortOrder=await NextSortOrder(input.CategoryId);
-  note.Title=input.Title;note.Body=input.Body;note.Code=input.Code;note.Tags=input.Tags;note.CategoryId=input.CategoryId;note.CompanyId=input.CompanyId;
-  note.SourceFile=input.SourceFile;note.SourcePage=input.SourcePage;note.UpdatedAt=DateTime.UtcNow;
+  note.Title=input.Title;note.Body=input.Body;note.Code=input.Code;note.CategoryId=input.CategoryId;note.CompanyId=input.CompanyId;
+  note.SourcePage=input.SourcePage;note.UpdatedAt=DateTime.UtcNow;
+  (await NoteLinks.LoadAsync(db)).Apply(note,input.TagsText,input.SourceText);
   await db.SaveChangesAsync();
+  await NoteLinks.RemoveOrphansAsync(db);
   if(inline){
    TempData["Flash"]=$"\"{note.Title}\" kaydedildi.";
    // Not başka bir firmaya/kategoriye taşındıysa listede kaybolmasın diye firma filtresi bırakılır.
@@ -140,6 +148,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   if (note is null) return NotFound();
   db.Notes.Remove(note);
   await db.SaveChangesAsync();
+  await NoteLinks.RemoveOrphansAsync(db);
   TempData["Flash"] = $"\"{note.Title}\" silindi.";
   if (category is null && string.IsNullOrWhiteSpace(q)) category = note.CategoryId;
   return RedirectToAction(nameof(Index), new { q, category, company });

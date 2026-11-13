@@ -87,14 +87,11 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
-                    b.Property<string>("SourceFile")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int?>("SourceId")
+                        .HasColumnType("int");
 
                     b.Property<int?>("SourcePage")
                         .HasColumnType("int");
-
-                    b.Property<string>("Tags")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -107,6 +104,8 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("SourceId");
 
                     b.HasIndex("Title");
 
@@ -149,6 +148,73 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.ToTable("NoteImages");
                 });
 
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteTag", b =>
+                {
+                    b.Property<int>("NoteId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TagId")
+                        .HasColumnType("int");
+
+                    b.HasKey("NoteId", "TagId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("NoteTags");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Source", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Section")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "Name", "Section")
+                        .IsUnique()
+                        .HasFilter("[Section] IS NOT NULL");
+
+                    b.ToTable("Sources");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Tag", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Tags");
+                });
+
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Note", b =>
                 {
                     b.HasOne("ABAPKnowledgeBase.Models.Category", "Category")
@@ -162,9 +228,16 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("ABAPKnowledgeBase.Models.Source", "Source")
+                        .WithMany("Notes")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Category");
 
                     b.Navigation("Company");
+
+                    b.Navigation("Source");
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteImage", b =>
@@ -176,6 +249,25 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteTag", b =>
+                {
+                    b.HasOne("ABAPKnowledgeBase.Models.Note", "Note")
+                        .WithMany("NoteTags")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ABAPKnowledgeBase.Models.Tag", "Tag")
+                        .WithMany("NoteTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+
+                    b.Navigation("Tag");
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Category", b =>
@@ -191,6 +283,18 @@ namespace ABAPKnowledgeBase.Data.Migrations
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Note", b =>
                 {
                     b.Navigation("Images");
+
+                    b.Navigation("NoteTags");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Source", b =>
+                {
+                    b.Navigation("Notes");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Tag", b =>
+                {
+                    b.Navigation("NoteTags");
                 });
 #pragma warning restore 612, 618
         }

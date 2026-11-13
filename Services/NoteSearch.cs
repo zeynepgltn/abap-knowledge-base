@@ -33,10 +33,11 @@ public static partial class NoteSearch {
   var hits = new List<Hit>();
   foreach (var note in notes) {
    var ocr = ocrByNote.GetValueOrDefault(note.Id);
+   var tags = string.Join(", ", note.TagNames);
    var score = 0;
    if (string.Equals(note.Title.Trim(), phrase, StringComparison.OrdinalIgnoreCase)) score += 100;
    else if (Find(note.Title, phrase) is var t && t >= 0) score += t == 0 ? 70 : 60;
-   if (Find(note.Tags, phrase) >= 0) score += 25;
+   if (Find(tags, phrase) >= 0) score += 25;
    if (Find(note.Code, phrase) >= 0) score += 20;
    if (Count(note.Body, phrase) is var n && n > 0) score += 15 + Math.Min(n, 5) * 3;
    if (Find(ocr, phrase) >= 0) score += 8;
@@ -44,21 +45,21 @@ public static partial class NoteSearch {
    if (score == 0 && words.Length > 1) {
     foreach (var w in words) {
      var inTitle = Find(note.Title, w) >= 0;
-     var anywhere = inTitle || Find(note.Body, w) >= 0 || Find(note.Code, w) >= 0 || Find(note.Tags, w) >= 0 || Find(ocr, w) >= 0;
+     var anywhere = inTitle || Find(note.Body, w) >= 0 || Find(note.Code, w) >= 0 || Find(tags, w) >= 0 || Find(ocr, w) >= 0;
      if (!anywhere) { score = 0; break; }
      score += inTitle ? 12 : 4;
     }
    }
    if (score == 0) continue;
-   var (where, before, match, after) = Snippet(note, ocr, phrase, words);
+   var (where, before, match, after) = Snippet(note, tags, ocr, phrase, words);
    hits.Add(new Hit(note, score, where, before, match, after));
   }
   return hits.OrderByDescending(h => h.Score).ThenByDescending(h => h.Note.UpdatedAt).ToList();
  }
 
  // Pasaj önce metinde, sonra kodda, etiketlerde ve resimdeki yazıda aranır; ifade yoksa ilk kelime aranır.
- private static (string Where, string Before, string Match, string After) Snippet(Note note, string? ocr, string phrase, string[] words) {
-  var sources = new (string Where, string? Text)[] { ("Metin", Clean(note.Body)), ("Kod", Clean(note.Code)), ("Etiket", note.Tags), ("Resimdeki yazı", Clean(ocr)) };
+ private static (string Where, string Before, string Match, string After) Snippet(Note note, string tags, string? ocr, string phrase, string[] words) {
+  var sources = new (string Where, string? Text)[] { ("Metin", Clean(note.Body)), ("Kod", Clean(note.Code)), ("Etiket", tags), ("Resimdeki yazı", Clean(ocr)) };
   var terms = words.Length > 1 ? words.Prepend(phrase).ToArray() : new[] { phrase };
   foreach (var term in terms)
    foreach (var (where, text) in sources)
@@ -93,6 +94,5 @@ public static partial class NoteSearch {
 
  // Sonuçlardaki etiketler (OneNote'tan gelenlerde bölüm adı); her notta kendiliğinden olan "onenote" sayılmaz.
  public static IEnumerable<string> TagsOf(Note note) =>
-  (note.Tags ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-   .Where(t => !t.Equals("onenote", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase);
+  note.TagNames.Where(t => !t.Equals("onenote", StringComparison.OrdinalIgnoreCase));
 }

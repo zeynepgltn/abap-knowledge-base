@@ -91,8 +91,10 @@ public static partial class OneNoteImporter
         db.Companies.AddRange(companies.Values);
         // Her kategoride sayfalar OneNote'taki sırayla dizilir (sonradan sürükle-bırak ile değiştirilebilir).
         var nextOrder = new Dictionary<string, int>();
+        var links = await NoteLinks.LoadAsync(db);
         foreach (var p in planned)
         {
+            links.Apply(p.Note, p.Note.TagsText, p.Note.SourceText);
             p.Note.CategoryId = categories[p.Category];
             p.Note.SortOrder = nextOrder[p.Category] = nextOrder.GetValueOrDefault(p.Category) + 1;
             if (p.Category == CategorySeed.Projects) p.Note.Company = companies[p.Page.Section.Trim()];
@@ -145,8 +147,9 @@ public static partial class OneNoteImporter
 
     private static async Task AddMissingAsync(NotesDbContext db, List<Planned> planned, string backupDir, string previewPath, bool apply)
     {
-        var existing = await db.Notes.AsNoTracking().Select(n => new { n.Id, n.Title, n.Body, n.SourceFile, n.UpdatedAt }).ToListAsync();
-        var bySource = existing.GroupBy(n => $"{n.SourceFile}|{n.Title.Trim()}").ToDictionary(g => g.Key, g => g.ToList());
+        var existing = await db.Notes.AsNoTracking().Include(n => n.Source)
+            .Select(n => new { n.Id, n.Title, n.Body, n.Source, n.UpdatedAt }).ToListAsync();
+        var bySource = existing.GroupBy(n => $"{n.Source}|{n.Title.Trim()}").ToDictionary(g => g.Key, g => g.ToList());
         var known = existing.Select(n => $"{n.Title.Trim()}|{Normalized(n.Body)}").ToHashSet();
 
         List<Planned> missing = [], changed = [];
@@ -157,7 +160,7 @@ public static partial class OneNoteImporter
         {
             if (p.Category == CategorySeed.Projects) { projects++; continue; }
             var body = Normalized(p.Note.Body);
-            if (bySource.TryGetValue($"{p.Note.SourceFile}|{p.Note.Title.Trim()}", out var rows) && rows.Count > 0)
+            if (bySource.TryGetValue($"{p.Note.SourceText}|{p.Note.Title.Trim()}", out var rows) && rows.Count > 0)
             {
                 // Aynı bölümde aynı başlıkta birden çok sayfa olabilir: önce içeriği aynı olanla eşleştir.
                 var match = rows.FirstOrDefault(r => Normalized(r.Body) == body);
@@ -198,8 +201,10 @@ public static partial class OneNoteImporter
         var categories = await db.Categories.ToDictionaryAsync(c => c.Name, c => c.Id);
         // Yeni sayfalar kategorilerinin sonuna, OneNote sırasıyla eklenir; mevcut sıra değişmez.
         var maxOrder = await db.Notes.GroupBy(n => n.CategoryId).Select(g => new { g.Key, Max = g.Max(n => n.SortOrder) }).ToDictionaryAsync(x => x.Key, x => x.Max);
+        var links = await NoteLinks.LoadAsync(db);
         foreach (var p in missing)
         {
+            links.Apply(p.Note, p.Note.TagsText, p.Note.SourceText);
             var categoryId = categories[p.Category];
             p.Note.CategoryId = categoryId;
             p.Note.SortOrder = maxOrder[categoryId] = maxOrder.GetValueOrDefault(categoryId) + 1;
@@ -244,8 +249,8 @@ public static partial class OneNoteImporter
             Title = title.Length > 180 ? title[..180] : title,
             Body = writer.ToString(),
             Code = null,
-            Tags = $"onenote, {page.Section}",
-            SourceFile = $"OneNote: {page.Notebook} › {section}",
+            TagsText = page.Section,
+            SourceText = $"OneNote: {page.Notebook} › {section}",
             SourcePage = page.Order,
             CreatedAt = ParseDate(page.Created),
             UpdatedAt = ParseDate(page.Modified),
@@ -414,12 +419,14 @@ public static partial class OneNoteImporter
     private static async Task<string> BackupAsync(NotesDbContext db, string dir)
     {
         Directory.CreateDirectory(dir);
-        // Eski şemada NoteImages tablosu olmayabilir; sadece not alanları okunur.
-        var notes = await db.Notes.AsNoTracking().Select(n => new
-        {
-            n.Title, n.Body, n.Code, n.Tags, Category = n.Category!.Name,
-            n.SourceFile, n.SourcePage, n.CreatedAt, n.UpdatedAt
-        }).ToListAsync();
+        // Sadece not alanları okunur (resimler yedeğe girmez).
+        var notes = (await db.Notes.AsNoTracking().Include(n => n.Source).Include(n => n.NoteTags).ThenInclude(t => t.Tag)
+            .Include(n => n.Category).AsSplitQuery().ToListAsync())
+            .Select(n => new
+            {
+                n.Title, n.Body, n.Code, Tags = string.Join(", ", n.TagNames), Category = n.Category!.Name,
+                Source = n.Source?.ToString(), n.SourcePage, n.CreatedAt, n.UpdatedAt
+            }).ToList();
         var path = Path.Combine(dir, $"notlar-{DateTime.Now:yyyyMMdd-HHmmss}.json");
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(notes, new JsonSerializerOptions
         {

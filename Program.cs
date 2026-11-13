@@ -23,25 +23,6 @@ using (var scope = app.Services.CreateScope()) {
   if (missing.Count > 0) { db.Categories.AddRange(missing.Select(x => new Category { Name = x })); db.SaveChanges(); }
 }
 
-if (args.Contains("--import-notes"))
-{
-    using var scope = app.Services.CreateScope();
-
-    var db = scope.ServiceProvider
-        .GetRequiredService<NotesDbContext>();
-
-    await PdfNotesImporter.RunAsync(
-        db,
-        Path.Combine(
-            app.Environment.ContentRootPath,
-            "ImportData",
-            "notlar.json"
-        )
-    );
-
-    return;
-}
-
 // OneNote aktarımı: --import-onenote önizleme yazar, --apply ile notlar yedeklenip veritabanı OneNote'tan yeniden kurulur.
 // --add ile sadece eksik sayfalar bulunur; --add --apply bunları mevcut notlara dokunmadan ekler.
 if (args.Contains("--import-onenote"))
