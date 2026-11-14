@@ -62,18 +62,6 @@ Eşlemede `"__ATLA__"` değeri o sayfa, bölüm veya bölüm grubunu (`"defter/g
 
 Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resim:N]` satırı notun N. resmi olarak gösterilir.
 
-## PDF notlarını içe aktarma (eski yöntem)
-
-PDF'lerden çıkarılmış notlar `ImportData/notlar.json` dosyasına konursa (alanlar: `Title`, `Body`, `Category`, `SourceFile`, `SourcePage`, `Tags`) şu komutla yüklenir:
-
-```powershell
-dotnet run -- --import-notes
-```
-
-- Komut notları ekler, sayıyı yazar ve kapanır (web sunucusu açılmaz).
-- Aynı kaynak dosya + sayfa numarasına sahip not zaten varsa tekrar eklenmez; komutu birden çok kez çalıştırmak güvenlidir.
-- JSON'daki kategori adı veritabanında yoksa not atlanır ve konsola yazılır.
-
 ## Özellikler
 
 - Not ekleme, düzenleme, silme (onaylı), listeleme ve detay görüntüleme
@@ -85,7 +73,7 @@ dotnet run -- --import-notes
 - 10 ABAP kategorisi + Projeler; ABAP terimlerine dayalı kategori önerisi (tam kelime eşleşmesi, ağırlıklı puan, kullanıcı onaylı)
 - Teknik sembolleri de (`?=`, `VALUE #(`) arayan arama: en ilgili sonuç üstte (başlık > etiket > kod > metin > resimdeki yazı), her sonuçta vurgulu pasaj, kategori ve etiket filtreleri; açılan notta eşleşmeler işaretlenir
 - Arama kabul testi: uygulama açıkken `powershell -ExecutionPolicy Bypass -File scripts\Test-Search.ps1` → `tests/arama-testleri.json`'daki sorgularda beklenen not ilk 5'te mi ölçer
-- Kaynak dosya adı ve sayfa numarası kaydı
+- Etiketler ve kaynaklar ayrı tablolarda: bir etiket birçok notta kullanılır; kaynak OneNote bölümü (`OneNote: defter › bölüm`) veya dosya adıdır, formda metin olarak girilir
 - 404 / hata durumunda uygulamanın kendi hata sayfası
 - Otomatik yedek: günlük + not kaydedince + kapanışta; son 14 gün yerelde ve OneDrive'da; iki bilgisayar arasında otomatik aktarım
 
@@ -150,13 +138,23 @@ OneNote'tan son aktarımı yaptıktan sonra `appsettings.json` → `"OneNote": {
 
 Açık olsa bile tam aktarım (`--import-onenote --apply`, veritabanını silip OneNote'tan yeniden kurar), sitede yazılmış (OneNote'tan gelmeyen) not varsa durur; `--force` olmadan silmez. Eksikleri eklemek için `--add --apply` kullanılabilir. Veritabanına yazan her aktarımdan önce tam yedek alınır.
 
+## Veri modeli
+
+| Tablo | İçerik |
+|---|---|
+| Notes | Başlık, metin, kod, kategori, firma, kaynak + sayfa no, sıra, tarihler |
+| Categories | 10 ABAP kategorisi + Projeler |
+| Companies | Projeler kategorisindeki firmalar |
+| Tags / NoteTags | Etiketler ve not–etiket bağlantıları (çoka çok) |
+| Sources | Notların kaynağı: OneNote defter + bölüm veya dosya adı |
+| NoteImages | Resimler ve resimlerden okunan yazı (OCR) |
+
 ## Bilinçli sınırlamalar
 
 - Bu bir **yerel prototip**: **kullanıcı girişi yok, internete açma**.
 - Kategori seçimi otomatik kaydedilmez; önerinin butonuna basarak seçersin.
 - Arama her notta "içinde geçiyor mu" kontrolüyle çalışır (büyük/küçük harf ve İ/ı farkı gözetmez), en fazla 1000 aday not inceler. Not sayısı on binlere çıkarsa SQLite FTS5 tam metin aramasına geçilmeli.
 - Veritabanı şeması EF Core migration'larıyla (`Data/Migrations`) yönetilir ve uygulama açılırken otomatik güncellenir. Modele alan eklersen: `dotnet ef migrations add <Ad> --configuration Release --output-dir Data/Migrations` (araç `dotnet tool restore` ile kurulur; uygulama açıkken `bin/Debug` kilitli olduğu için Release kullanılır).
-- PDF'ten çıkarılan notlarda metin düzeni bozuk olabilir (sütunlar karışmış, kod `Code` yerine `Body` içinde).
 
 ## Örnek test
 

@@ -6,6 +6,9 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
  public DbSet<Category> Categories => Set<Category>();
  public DbSet<NoteImage> NoteImages => Set<NoteImage>();
  public DbSet<Company> Companies => Set<Company>();
+ public DbSet<Tag> Tags => Set<Tag>();
+ public DbSet<NoteTag> NoteTags => Set<NoteTag>();
+ public DbSet<Source> Sources => Set<Source>();
  protected override void OnModelCreating(ModelBuilder modelBuilder) {
    // Aramada Türkçe uyumlu, büyük/küçük harf duyarsız "içinde geçiyor mu" (bkz. SqliteSetup.cs).
    modelBuilder.HasDbFunction(typeof(TextMatch).GetMethod(nameof(TextMatch.Contains))!).HasName("tr_contains");
@@ -18,6 +21,14 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
    // Firması olan not varken firma silinemez (önce notlar taşınmalı/silinmeli).
    modelBuilder.Entity<Note>().HasOne(x=>x.Company).WithMany(x=>x.Notes).HasForeignKey(x=>x.CompanyId).OnDelete(DeleteBehavior.Restrict);
    modelBuilder.Entity<Company>().HasIndex(x=>x.Name).IsUnique();
+   // Etiketler: not silinince bağlantıları da silinir; etiketin kendisi başka notlarda kullanılabilir.
+   modelBuilder.Entity<Tag>().HasIndex(x=>x.Name).IsUnique();
+   modelBuilder.Entity<NoteTag>().HasKey(x=>new{x.NoteId,x.TagId});
+   modelBuilder.Entity<NoteTag>().HasOne(x=>x.Note).WithMany(x=>x.NoteTags).HasForeignKey(x=>x.NoteId).OnDelete(DeleteBehavior.Cascade);
+   modelBuilder.Entity<NoteTag>().HasOne(x=>x.Tag).WithMany(x=>x.NoteTags).HasForeignKey(x=>x.TagId).OnDelete(DeleteBehavior.Cascade);
+   // Kaynak: aynı defter/bölüm veya dosya bir kez tutulur; kaynağı silinen notun kaynak bilgisi boşalır.
+   modelBuilder.Entity<Source>().HasIndex(x=>new{x.Kind,x.Name,x.Section}).IsUnique();
+   modelBuilder.Entity<Note>().HasOne(x=>x.Source).WithMany(x=>x.Notes).HasForeignKey(x=>x.SourceId).OnDelete(DeleteBehavior.SetNull);
  }
 }
 public static class CategorySeed {
