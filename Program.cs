@@ -105,7 +105,8 @@ if (args.Contains("--import-onenote"))
         Path.Combine(root, "ImportData"),
         apply: args.Contains("--apply"),
         add: args.Contains("--add"),
-        force: args.Contains("--force"));
+        force: args.Contains("--force"),
+        updateChanged: args.Contains("--update-changed"));
     return;
 }
 

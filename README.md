@@ -56,9 +56,9 @@ dotnet run -- --import-onenote --add          # önizleme, veritabanına dokunma
 dotnet run -- --import-onenote --add --apply  # eksikleri ekler
 ```
 
-Var olan notlar, sıralamalar ve firmalar değişmez; yeni sayfalar kategorilerinin sonuna eklenir. Projeler kategorisine giden sayfalar bu modda eklenmez. Birebir aynı başlık ve içeriğe sahip sayfalar ikinci kez eklenmez. OneNote'ta sonradan değişen sayfaların üzerine yazılmaz, önizlemede listelenir (içi boş olan notlar doldurulur).
+Var olan notlar, sıralamalar ve firmalar değişmez; yeni sayfalar kategorilerinin sonuna eklenir. Projeler'e giden sayfalar firmalarına eklenir; firma yoksa oluşturulur (büyük/küçük harf farkı gözetilmez). Birebir aynı başlık ve içeriğe sahip sayfalar ikinci kez eklenmez. OneNote'ta sonradan değişen sayfaların üzerine yazılmaz, önizlemede listelenir (içi boş olan notlar doldurulur). Sitede düzenlenmemiş olduklarından eminsen `--update-changed` ile OneNote'taki güncel hâlleri alınır (kategori, firma, etiket ve sıra korunur).
 
-Eşlemede `"__ATLA__"` değeri o sayfa, bölüm veya bölüm grubunu (`"defter/grup/*"`) tamamen dışarıda bırakır.
+Eşlemede `"__ATLA__"` değeri o sayfa, bölüm veya bölüm grubunu (`"defter/grup/*"`) tamamen dışarıda bırakır. `"Projeler:Firma"` değeri sayfaları Projeler'de o firmaya ekler (ör. `"zonte/MOROCCO-FAS/*": "Projeler:MOROCCO-FAS"`); sadece `"Projeler"` yazılırsa firma OneNote bölüm adıdır.
 
 Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resim:N]` satırı notun N. resmi olarak gösterilir.
 
