@@ -27,12 +27,14 @@ public sealed class NoteMaterial {
 /// kalan kötü soruları kullanıcının 👎 puanları gösterecek.
 /// </summary>
 public static partial class QuizMaterial {
+ private static readonly System.Globalization.CultureInfo Turkish = new("tr-TR");
  // "Not: ...", "Örnek: ..." gibi kavram olmayan etiketler.
  private static readonly HashSet<string> Labels = new(StringComparer.OrdinalIgnoreCase) {
   "not","notlar","örnek","örneğin","örnekler","dikkat","açıklama","amaç","sonuç","neden","önemli","kullanım","fark","farklar",
   "özet","ipucu","uyarı","adım","adımlar","avantaj","avantajlar","dezavantaj","kısaca","yani","mesela","soru","cevap","kaynak",
   "tarih","link","url","sebep","çözüm","problem","sorun","hata","durum","senaryo","mantık","işlem","yöntem","kod","tanım",
-  "anlamı","görev","görevi","ne işe yarar","nedir","nasıl","özellik","özellikler","sonuçlar","çıktı","girdi","tip","türü","örnek kod" };
+  "anlamı","görev","görevi","ne işe yarar","nedir","nasıl","özellik","özellikler","sonuçlar","çıktı","girdi","tip","türü","örnek kod",
+  "avantajları","dezavantajları","nasıl çalışır","kullanımı","içeriği","özellikleri","farkı","amacı","nedeni","notlar","detay","detaylar" };
 
  [GeneratedRegex(@"^\s*(?:[•\-\*·▪►●○◦]|\d{1,2}[.)])?\s*(?<term>[^:|]{2,70}?)\s*:\s+(?<def>\S.{18,})$")]
  private static partial Regex ColonPair();
@@ -105,8 +107,10 @@ public static partial class QuizMaterial {
   if (!isCode) {
    // Kavram kısa olmalı ve cümle ortası olmamalı: büyük harf/rakamla başlar, en fazla 5 kelime,
    // açıklama küçük harfle başlıyorsa önceki cümlenin devamıdır.
-   if (Labels.Contains(term) || NumberedHeading().IsMatch(term) || term.Split(' ').Length > 5 || term.Length > 50) return;
+   if (Labels.Contains(term.ToLower(Turkish)) || NumberedHeading().IsMatch(term) || term.Split(' ').Length > 5 || term.Length > 50) return;
    if (!char.IsUpper(term[0]) && !char.IsDigit(term[0])) return;
+   // Sadece sayı ("130", "10 5") kavram değildir.
+   if (!term.Any(char.IsLetter)) return;
    if (minDef > 2 && char.IsLower(def[0])) return;
   }
   pairs.Add(new QuizPair(term, def, isCode));

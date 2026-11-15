@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ABAPKnowledgeBase.Data;
 using ABAPKnowledgeBase.Models;
 namespace ABAPKnowledgeBase.Services;
 
@@ -104,19 +105,48 @@ public sealed partial class RuleQuizGenerator(Random rng) {
  // Orta: notun üç kavramı + başka kategoriden bir kavram; farklı olan bulunur.
  private QuizQuestion? OddOneOut(NoteMaterial m) {
   var own = m.Concepts.Where(p => p.Term.Length <= 40).ToList();
-  if (own.Count < 3) return null;
-  var three = Shuffle(own).Take(3).ToList();
-  var outsiders = pool.Where(o => o.Category != m.Category)
-   .SelectMany(o => o.Concepts.Where(p => p.Term.Length <= 40).Select(p => (o, p)))
-   .Where(x => !Contains(m.AllText, QuizMaterial.Core(x.p.Term)) && !three.Any(t => Same(t.Term, x.p.Term)))
-   .ToList();
-  if (outsiders.Count == 0) return null;
-  var (other, odd) = outsiders[rng.Next(outsiders.Count)];
-  return Build("farkli-olan", $"Aşağıdakilerden hangisi “{m.Note.Title}” notunda anlatılan kavramlardan biri DEĞİL?",
-   null, odd.Term, three.Select(t => t.Term).ToList(),
-   $"“{odd.Term}”, {other.Category} kategorisindeki “{other.Note.Title}” notundan. " +
-   $"Diğerleri bu notta geçiyor: {string.Join(", ", three.Select(t => t.Term))}.");
+  // Dört şık aynı biçimde olmalı (hepsi kod/Tcode ya da hepsi terim): biçimi farklı olan şık
+  // içeriği bilinmeden "farklı olan" diye seçilebilir.
+  foreach (var shape in Shuffle(own.Select(p => Shape(p.Term)).Distinct().ToList())) {
+   var same = own.Where(p => Shape(p.Term) == shape).ToList();
+   if (same.Count < 3) continue;
+   var three = Shuffle(same).Take(3).ToList();
+   var noteText = TextMatch.Fold(m.AllText);
+   var outsiders = pool.Where(o => o.Category != m.Category)
+    .SelectMany(o => o.Concepts.Where(p => p.Term.Length <= 40 && Shape(p.Term) == shape).Select(p => (o, p)))
+    .Where(x => !three.Any(t => Same(t.Term, x.p.Term)) && !Related(noteText, x.p.Term))
+    .ToList();
+   if (outsiders.Count == 0) continue;
+   var (other, odd) = outsiders[rng.Next(outsiders.Count)];
+   return Build("farkli-olan", $"Aşağıdakilerden hangisi “{m.Note.Title}” notunda anlatılan kavramlardan biri DEĞİL?",
+    null, odd.Term, three.Select(t => t.Term).ToList(),
+    $"“{odd.Term}”, {other.Category} kategorisindeki “{other.Note.Title}” notundan. " +
+    $"Diğerleri bu notta geçiyor: {string.Join(", ", three.Select(t => t.Term))}.");
+  }
+  return null;
  }
+
+ // Kavramın biçimi: "kod" = SE10, MONTH_TAB, cl_gui_alv_grid gibi tek parça teknik ad; "terim" = kelimelerden oluşan ad.
+ private static string Shape(string term) =>
+  CodeLikeTerm().IsMatch(QuizMaterial.Core(term)) ? "kod" : "terim";
+ // Tamamı büyük harf (APPEND, SE10) ya da rakam/alt çizgi içeren tek parça ad (lv_x, cl_gui_alv_grid). "Prefix" terimdir.
+ // "CORRESPONDING FIELDS OF" gibi büyük harfli ABAP ifadeleri de kod sayılır.
+ [GeneratedRegex(@"^(?:[A-Z0-9_/~\-]{2,}|[A-Z][A-Z0-9_ #()]*[A-Z0-9)]|[A-Za-z0-9/~\-]*[0-9_][A-Za-z0-9_/~\-]*)$")]
+ private static partial Regex CodeLikeTerm();
+
+ // Dışarıdan gelen kavram notla ilgili mi? Tamamı ya da anlamlı kelimelerinin yarısı notta geçiyorsa
+ // ilgilidir ("Debug ve Takip Zorluğu" ↔ nottaki "takip zorluğu") ve "farklı olan" şıkkı olamaz.
+ private static bool Related(string foldedNoteText, string term) {
+  var core = TextMatch.Fold(QuizMaterial.Core(term));
+  if (core.Length >= 3 && foldedNoteText.Contains(core, StringComparison.Ordinal)) return true;
+  var words = WordSplit().Split(core).Where(w => w.Length >= 4 && !FillerWords.Contains(w)).Distinct().ToList();
+  if (words.Count == 0) return false;
+  var found = words.Count(w => foldedNoteText.Contains(w, StringComparison.Ordinal));
+  return found * 2 >= words.Count;
+ }
+ [GeneratedRegex(@"[^\p{L}\p{N}_]+")]
+ private static partial Regex WordSplit();
+ private static readonly HashSet<string> FillerWords = ["veya", "gibi", "için", "ile", "olan", "olarak", "daha", "kadar"];
 
  // ---------- Kod soruları ----------
 
