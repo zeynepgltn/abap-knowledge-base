@@ -76,14 +76,11 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("SourceFile")
-                        .HasColumnType("TEXT");
+                    b.Property<int?>("SourceId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SourcePage")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Tags")
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -96,6 +93,8 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("SourceId");
 
                     b.HasIndex("Title");
 
@@ -136,6 +135,189 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.ToTable("NoteImages");
                 });
 
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteReview", b =>
+                {
+                    b.Property<int>("NoteId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Box")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CorrectCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastReviewedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WrongCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("NoteId");
+
+                    b.HasIndex("DueDate");
+
+                    b.ToTable("NoteReviews");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteTag", b =>
+                {
+                    b.Property<int>("NoteId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TagId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("NoteId", "TagId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("NoteTags");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.QuizDay", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Generator")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date")
+                        .IsUnique();
+
+                    b.ToTable("QuizDays");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.QuizQuestion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("AnswerIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("AnsweredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChoicesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CorrectIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Difficulty")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Explanation")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("NoteId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("QuizDayId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NoteId");
+
+                    b.HasIndex("QuizDayId", "Order")
+                        .IsUnique();
+
+                    b.ToTable("QuizQuestions");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Source", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Section")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "Name", "Section")
+                        .IsUnique();
+
+                    b.ToTable("Sources");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Tag", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Tags");
+                });
+
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Note", b =>
                 {
                     b.HasOne("ABAPKnowledgeBase.Models.Category", "Category")
@@ -149,9 +331,16 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("ABAPKnowledgeBase.Models.Source", "Source")
+                        .WithMany("Notes")
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Category");
 
                     b.Navigation("Company");
+
+                    b.Navigation("Source");
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteImage", b =>
@@ -163,6 +352,54 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteReview", b =>
+                {
+                    b.HasOne("ABAPKnowledgeBase.Models.Note", "Note")
+                        .WithOne()
+                        .HasForeignKey("ABAPKnowledgeBase.Models.NoteReview", "NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteTag", b =>
+                {
+                    b.HasOne("ABAPKnowledgeBase.Models.Note", "Note")
+                        .WithMany("NoteTags")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ABAPKnowledgeBase.Models.Tag", "Tag")
+                        .WithMany("NoteTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+
+                    b.Navigation("Tag");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.QuizQuestion", b =>
+                {
+                    b.HasOne("ABAPKnowledgeBase.Models.Note", "Note")
+                        .WithMany()
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ABAPKnowledgeBase.Models.QuizDay", "QuizDay")
+                        .WithMany("Questions")
+                        .HasForeignKey("QuizDayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Note");
+
+                    b.Navigation("QuizDay");
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Category", b =>
@@ -178,6 +415,23 @@ namespace ABAPKnowledgeBase.Data.Migrations
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Note", b =>
                 {
                     b.Navigation("Images");
+
+                    b.Navigation("NoteTags");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.QuizDay", b =>
+                {
+                    b.Navigation("Questions");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Source", b =>
+                {
+                    b.Navigation("Notes");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Tag", b =>
+                {
+                    b.Navigation("NoteTags");
                 });
 #pragma warning restore 612, 618
         }

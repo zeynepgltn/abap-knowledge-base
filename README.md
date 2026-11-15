@@ -76,6 +76,26 @@ Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resi
 - Etiketler ve kaynaklar ayrı tablolarda: bir etiket birçok notta kullanılır; kaynak OneNote bölümü (`OneNote: defter › bölüm`) veya dosya adıdır, formda metin olarak girilir
 - 404 / hata durumunda uygulamanın kendi hata sayfası
 - Otomatik yedek: günlük + not kaydedince + kapanışta; son 14 gün yerelde ve OneDrive'da; iki bilgisayar arasında otomatik aktarım
+- Günün Quiz'i (aşağıda)
+
+## Günün Quiz'i
+
+Menüdeki **Günün Quiz'i** her gün notlardan 5 soru hazırlar: 3 mantık + 2 kod; 1 kolay + 3 orta + 1 zor. Ücretli servis kullanmaz, tamamen yerel çalışır.
+
+| # | Tür · Zorluk | Soru tipi |
+|---|---|---|
+| 1 | Mantık · Kolay | Açıklaması verilen kavram hangisi? |
+| 2 | Mantık · Orta | Kavramın doğru açıklaması hangisi? |
+| 3 | Mantık · Orta | Hangisi bu notun kavramlarından biri değil? |
+| 4 | Kod · Orta | Bu kod satırı ne yapar? (yoksa: boşluğa hangi anahtar kelime gelir?) |
+| 5 | Kod · Zor | Kod parçasındaki hatalı satır hangisi? |
+
+- **Sorular nereden gelir:** notlardaki `KAVRAM: açıklama` ve `KAVRAM | açıklama` satırları ile kod bloklarından, kurallarla (`Services/QuizMaterial.cs`, `Services/RuleQuizGenerator.cs`). Not ne kadar bu düzende yazılırsa sorular o kadar iyi olur.
+- **Aralıklı tekrar (Leitner):** doğru cevap notu bir üst kutuya taşır (1, 2, 4, 8, 16 gün sonra yeniden sorulur), yanlış cevap 1. kutuya geri gönderir. Önce yanlış bilinenler, sonra hiç sorulmamış notlar gelir.
+- **Gün boyu aynı quiz:** sorular veritabanına yazılır; yedekle diğer bilgisayara da geçer. Henüz cevap vermediysen **↻ Başka sorular** ile yenilenebilir.
+- **👍 / 👎:** her cevaptan sonra sorunun iyi olup olmadığını işaretle. Bu puanlar ileride soru kalitesini ölçmek ve makine öğrenmesi modeli eğitmek için veri seti olacak.
+- **Kapsam:** `appsettings.json` → `Quiz:ExcludeCategories` (varsayılan: Projeler, firmaya özel notlar).
+- **Önizleme:** `dotnet run -- --quiz-onizleme 7` kaydetmeden 7 günlük örnek quiz yazar.
 
 ## Yedekleme ve iki bilgisayar
 
@@ -111,7 +131,7 @@ OneNote'tan aktarım bitince notlar **doğrudan bu siteye** yazılacak; veritaba
 ### SQL Server'dan SQLite'a geçiş (bir kez, notların olduğu bilgisayarda)
 
 1. `git pull`
-2. `dotnet run`. SQLite boş olduğu ve bu bilgisayarda eski `.\SQLEXPRESS` veritabanı bulunduğu için notlar, firmalar ve resimler kendiliğinden SQLite'a kopyalanır. Konsolda her tablo için `SQL Server: N  SQLite: N ✓` satırları ve hemen ardından `Bulut kopyası çıkarıldı` görünür.
+2. `dotnet run`. SQLite boş olduğu ve bu bilgisayarda eski `.\SQLEXPRESS` veritabanı bulunduğu için notlar, firmalar, resimler, etiketler ve kaynaklar kendiliğinden SQLite'a kopyalanır. Eski veritabanında etiket/kaynak ister metin sütunlarında ister ayrı tablolarda olsun aktarılır. Konsolda her tablo için `SQL Server: N  SQLite: N ✓` satırları (etiketli ve kaynaklı not sayıları dahil) ve hemen ardından `Bulut kopyası çıkarıldı` görünür.
 3. Diğer bilgisayarda: OneDrive senkronlanınca `git pull` + `dotnet run` yap, notlar kendiliğinden gelir.
 
 SQL Server'daki veriye dokunulmaz (sadece okunur); bir şey ters giderse eski hâl orada durur. Aktarım elle de çalıştırılabilir: `dotnet run -- --import-sqlserver`. SQLite'ta not varsa ikinci kez aktarmaz. Kaynak bağlantı: `appsettings.json` → `ConnectionStrings:SqlServer`. Geçiş oturduktan sonra SQL Server kaldırılabilir.
@@ -120,6 +140,7 @@ SQL Server'daki veriye dokunulmaz (sadece okunur); bir şey ters giderse eski h�
 
 ```powershell
 dotnet run -- --backup                     # hemen yedek al, OneDrive'a kopyala ve çık
+dotnet run -- --quiz-onizleme 7            # kaydetmeden 7 günlük örnek quiz yaz
 dotnet run -- --restore-from-cloud         # OneDrive'daki son yedeği yükle
 dotnet run -- --restore "C:\yol\ABAPKnowledgeBase-20261113.db"  # belirli bir günün yedeğini yükle
 ```
@@ -148,6 +169,8 @@ Açık olsa bile tam aktarım (`--import-onenote --apply`, veritabanını silip 
 | Tags / NoteTags | Etiketler ve not–etiket bağlantıları (çoka çok) |
 | Sources | Notların kaynağı: OneNote defter + bölüm veya dosya adı |
 | NoteImages | Resimler ve resimlerden okunan yazı (OCR) |
+| QuizDays / QuizQuestions | Günlük quiz'ler, sorular, verilen cevaplar ve 👍/👎 puanları |
+| NoteReviews | Her notun aralıklı tekrar kutusu ve sonraki tekrar tarihi |
 
 ## Bilinçli sınırlamalar
 

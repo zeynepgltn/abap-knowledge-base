@@ -47,7 +47,8 @@ document.addEventListener('DOMContentLoaded',()=>{
  const docBody=document.querySelector('.doc-body[data-highlight]');
  const query=docBody?.dataset.highlight.trim();
  if(query){
-  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  // Sunucudaki aramayla aynı: İ/I/ı/i birbirinin yerine geçer.
+  const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/[iİIı]/g,'[iİIı]');
   const mark=pattern=>{
    const rx=new RegExp(pattern,'gi'), nodes=[], walker=document.createTreeWalker(docBody,NodeFilter.SHOW_TEXT);
    while(walker.nextNode()){rx.lastIndex=0; if(rx.test(walker.currentNode.nodeValue))nodes.push(walker.currentNode);}

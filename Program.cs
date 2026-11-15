@@ -19,6 +19,7 @@ builder.Services.AddHostedService<BackupScheduler>();
 // Kapanışta (Ctrl+C) son yedeğin bitmesine zaman tanı.
 builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromMinutes(2));
 builder.Services.AddSingleton<ClassificationService>();
+builder.Services.AddScoped<QuizService>();
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Error"); app.UseHsts(); }
@@ -50,7 +51,7 @@ if (args.Contains("--restore") || args.Contains("--restore-from-cloud"))
 
 // İki bilgisayar: diğer bilgisayar OneDrive'a daha yeni yedek bıraktıysa site açılmadan önce buraya alınır.
 // İki tarafta da yedeklenmemiş değişiklik varsa hiçbirini ezmeden durur (--keep-local / --restore-from-cloud ile seçilir).
-var toolMode = args.Any(a => a is "--backup" or "--import-notes" or "--import-onenote" or "--import-sqlserver");
+var toolMode = args.Any(a => a is "--backup" or "--import-onenote" or "--import-sqlserver" or "--quiz-onizleme");
 if (!toolMode && !args.Contains("--keep-local")
     && !await RestoreService.SyncFromCloudIfNewerAsync(app.Configuration, root))
     return;
@@ -83,15 +84,6 @@ if (args.Contains("--backup"))
     return;
 }
 
-if (args.Contains("--import-notes"))
-{
-    using var scope = app.Services.CreateScope();
-    await PdfNotesImporter.RunAsync(
-        scope.ServiceProvider.GetRequiredService<NotesDbContext>(),
-        Path.Combine(root, "ImportData", "notlar.json"));
-    return;
-}
-
 // OneNote aktarımı: --import-onenote önizleme yazar, --apply ile notlar yedeklenip veritabanı OneNote'tan yeniden kurulur.
 // --add ile sadece eksik sayfalar bulunur; --add --apply bunları mevcut notlara dokunmadan ekler.
 if (args.Contains("--import-onenote"))
@@ -114,6 +106,33 @@ if (args.Contains("--import-onenote"))
         apply: args.Contains("--apply"),
         add: args.Contains("--add"),
         force: args.Contains("--force"));
+    return;
+}
+
+// --quiz-onizleme [N]: kaydetmeden N günlük örnek quiz yazar (soru kalitesini görmek için).
+if (args.Contains("--quiz-onizleme"))
+{
+    var idx = Array.IndexOf(args, "--quiz-onizleme");
+    var days = idx + 1 < args.Length && int.TryParse(args[idx + 1], out var n) ? n : 1;
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    using var scope = app.Services.CreateScope();
+    var quiz = scope.ServiceProvider.GetRequiredService<QuizService>();
+    var pool = await quiz.LoadPoolAsync();
+    Console.WriteLine($"Quiz havuzu: {pool.Count} not, {pool.Sum(m => m.Concepts.Count())} kavram, {pool.Sum(m => m.CodePairs.Count())} açıklamalı kod satırı, {pool.Sum(m => m.CodeBlocks.Count)} kod bloğu.");
+    for (var d = 0; d < days; d++)
+    {
+        var date = QuizService.Today.AddDays(d);
+        Console.WriteLine($"\n======== {date:dd.MM.yyyy} ========");
+        foreach (var q in await quiz.PreviewAsync(date, date.DayNumber))
+        {
+            Console.WriteLine($"\n[{q.Order}] {q.Kind} · {q.Difficulty} · {q.Type} · not #{q.NoteId}");
+            Console.WriteLine(q.Prompt);
+            if (q.Code is not null) Console.WriteLine("  " + q.Code.Replace("\n", "\n  "));
+            var choices = q.Choices;
+            for (var i = 0; i < choices.Count; i++) Console.WriteLine($"  {(i == q.CorrectIndex ? "*" : " ")} {(char)('A' + i)}) {choices[i]}");
+            Console.WriteLine($"  → {q.Explanation}");
+        }
+    }
     return;
 }
 

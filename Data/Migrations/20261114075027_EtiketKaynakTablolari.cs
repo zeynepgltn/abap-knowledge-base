@@ -8,6 +8,7 @@ namespace ABAPKnowledgeBase.Data.Migrations
     /// Notes.Tags (virgüllü metin) -> Tags + NoteTags, Notes.SourceFile (metin) -> Sources + Notes.SourceId.
     /// Var olan veriler taşınır, eski sütunlar en son silinir. Her nota kendiliğinden eklenen "onenote"
     /// etiketi taşınmaz: notun OneNote'tan geldiği artık kaynak bilgisinden görülüyor.
+    /// Ayrıştırma kuralları NoteLinks.ParseTags / ParseSource ile aynıdır.
     /// </summary>
     public partial class EtiketKaynakTablolari : Migration
     {
@@ -17,18 +18,18 @@ namespace ABAPKnowledgeBase.Data.Migrations
             migrationBuilder.AddColumn<int>(
                 name: "SourceId",
                 table: "Notes",
-                type: "int",
+                type: "INTEGER",
                 nullable: true);
 
             migrationBuilder.CreateTable(
                 name: "Sources",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Kind = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Section = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Kind = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
+                    Section = table.Column<string>(type: "TEXT", maxLength: 300, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -39,9 +40,9 @@ namespace ABAPKnowledgeBase.Data.Migrations
                 name: "Tags",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -52,8 +53,8 @@ namespace ABAPKnowledgeBase.Data.Migrations
                 name: "NoteTags",
                 columns: table => new
                 {
-                    NoteId = table.Column<int>(type: "int", nullable: false),
-                    TagId = table.Column<int>(type: "int", nullable: false)
+                    NoteId = table.Column<int>(type: "INTEGER", nullable: false),
+                    TagId = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -72,42 +73,45 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            // Kaynaklar: "OneNote: defter › bölüm" -> (OneNote, defter, bölüm); diğer metinler -> (Dosya, metin).
+            // Kaynaklar: "OneNote: defter › bölüm" OneNote kaynağıdır, geri kalan her metin dosya adıdır.
             migrationBuilder.Sql("""
-                SELECT n.Id,
-                       CASE WHEN n.SourceFile LIKE N'OneNote: %›%' THEN N'OneNote' ELSE N'Dosya' END AS Kind,
-                       LEFT(LTRIM(RTRIM(CASE WHEN n.SourceFile LIKE N'OneNote: %›%'
-                            THEN SUBSTRING(n.SourceFile, 10, CHARINDEX(N'›', n.SourceFile) - 10)
-                            ELSE n.SourceFile END)), 200) AS Name,
-                       CASE WHEN n.SourceFile LIKE N'OneNote: %›%'
-                            THEN LEFT(LTRIM(RTRIM(SUBSTRING(n.SourceFile, CHARINDEX(N'›', n.SourceFile) + 1, 400))), 300) END AS Section
-                INTO #src
-                FROM Notes n
-                WHERE n.SourceFile IS NOT NULL AND LTRIM(RTRIM(n.SourceFile)) <> N'';
+                CREATE TEMP TABLE src AS
+                SELECT Id,
+                       CASE WHEN one THEN 'OneNote' ELSE 'Dosya' END AS Kind,
+                       CASE WHEN one THEN trim(substr(substr(s, 10, sep - 10), 1, 200)) ELSE trim(substr(s, 1, 200)) END AS Name,
+                       CASE WHEN one THEN trim(substr(substr(s, sep + 3), 1, 300)) END AS Section
+                FROM (SELECT Id, s, instr(s, ' › ') AS sep, (s LIKE 'OneNote: %' AND instr(s, ' › ') > 10) AS one
+                      FROM (SELECT Id, trim(SourceFile) AS s FROM Notes WHERE SourceFile IS NOT NULL AND trim(SourceFile) <> ''));
 
-                INSERT INTO Sources (Kind, Name, Section) SELECT DISTINCT Kind, Name, Section FROM #src;
+                INSERT INTO Sources (Kind, Name, Section)
+                SELECT Kind, MIN(Name), MIN(Section) FROM src GROUP BY Kind, lower(Name), lower(Section);
 
-                UPDATE n SET SourceId = s.Id
-                FROM Notes n
-                JOIN #src x ON x.Id = n.Id
-                JOIN Sources s ON s.Kind = x.Kind AND s.Name = x.Name AND (s.Section = x.Section OR (s.Section IS NULL AND x.Section IS NULL));
+                UPDATE Notes SET SourceId = (
+                    SELECT s.Id FROM src x JOIN Sources s
+                      ON s.Kind = x.Kind AND lower(s.Name) = lower(x.Name) AND lower(s.Section) IS lower(x.Section)
+                    WHERE x.Id = Notes.Id);
 
-                DROP TABLE #src;
+                DROP TABLE src;
                 """);
 
-            // Etiketler: virgülle ayrılmış metin bölünür, boşluklar kırpılır, aynı ad bir kez tutulur.
+            // Etiketler: virgülle ayrılmış metin bölünür, boşluklar kırpılır, aynı ad (büyük/küçük harf farkı
+            // gözetmeden) bir kez tutulur.
             migrationBuilder.Sql("""
-                SELECT DISTINCT n.Id AS NoteId, LEFT(LTRIM(RTRIM(v.value)), 100) AS Name
-                INTO #tg
-                FROM Notes n CROSS APPLY STRING_SPLIT(n.Tags, N',') v
-                WHERE n.Tags IS NOT NULL AND LTRIM(RTRIM(v.value)) NOT IN (N'', N'onenote');
+                CREATE TEMP TABLE tg AS
+                WITH RECURSIVE split(NoteId, item, rest) AS (
+                    SELECT Id, '', Tags || ',' FROM Notes WHERE Tags IS NOT NULL AND trim(Tags) <> ''
+                    UNION ALL
+                    SELECT NoteId, trim(substr(rest, 1, instr(rest, ',') - 1)), substr(rest, instr(rest, ',') + 1)
+                    FROM split WHERE rest <> '')
+                SELECT DISTINCT NoteId, trim(substr(item, 1, 100)) AS Name
+                FROM split WHERE item <> '' AND lower(item) <> 'onenote';
 
-                INSERT INTO Tags (Name) SELECT DISTINCT Name FROM #tg;
+                INSERT INTO Tags (Name) SELECT MIN(Name) FROM tg GROUP BY lower(Name);
 
-                INSERT INTO NoteTags (NoteId, TagId)
-                SELECT DISTINCT t.NoteId, g.Id FROM #tg t JOIN Tags g ON g.Name = t.Name;
+                INSERT OR IGNORE INTO NoteTags (NoteId, TagId)
+                SELECT t.NoteId, g.Id FROM tg t JOIN Tags g ON lower(g.Name) = lower(t.Name);
 
-                DROP TABLE #tg;
+                DROP TABLE tg;
                 """);
 
             migrationBuilder.DropColumn(
@@ -132,8 +136,7 @@ namespace ABAPKnowledgeBase.Data.Migrations
                 name: "IX_Sources_Kind_Name_Section",
                 table: "Sources",
                 columns: new[] { "Kind", "Name", "Section" },
-                unique: true,
-                filter: "[Section] IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Tags_Name",
@@ -153,27 +156,6 @@ namespace ABAPKnowledgeBase.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "SourceFile",
-                table: "Notes",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Tags",
-                table: "Notes",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            // Geri alırken metinler tablolardan yeniden kurulur.
-            migrationBuilder.Sql("""
-                UPDATE n SET SourceFile = CASE s.Kind WHEN N'OneNote' THEN N'OneNote: ' + s.Name + N' › ' + s.Section ELSE s.Name END
-                FROM Notes n JOIN Sources s ON s.Id = n.SourceId;
-
-                UPDATE n SET Tags = (SELECT STRING_AGG(g.Name, N', ') FROM NoteTags nt JOIN Tags g ON g.Id = nt.TagId WHERE nt.NoteId = n.Id)
-                FROM Notes n;
-                """);
-
             migrationBuilder.DropForeignKey(
                 name: "FK_Notes_Sources_SourceId",
                 table: "Notes");
@@ -194,6 +176,18 @@ namespace ABAPKnowledgeBase.Data.Migrations
             migrationBuilder.DropColumn(
                 name: "SourceId",
                 table: "Notes");
+
+            migrationBuilder.AddColumn<string>(
+                name: "SourceFile",
+                table: "Notes",
+                type: "TEXT",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "Tags",
+                table: "Notes",
+                type: "TEXT",
+                nullable: true);
         }
     }
 }

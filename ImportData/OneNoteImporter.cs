@@ -75,7 +75,7 @@ public static partial class OneNoteImporter
 
         // Tam aktarım veritabanını SİLİP OneNote'tan yeniden kurar. Notlar artık doğrudan uygulamaya
         // yazıldığı için bu, OneNote'ta olmayan notları kaybettirir; korumalar:
-        var ownNotes = await db.Notes.CountAsync(n => n.SourceFile == null || !n.SourceFile.StartsWith("OneNote:"));
+        var ownNotes = await db.Notes.CountAsync(n => n.Source == null || n.Source.Kind != Source.OneNote);
         if (ownNotes > 0 && !force)
         {
             Console.WriteLine($"Veritabanında OneNote'tan gelmeyen {ownNotes} not var (uygulamada yazılmış). Tam aktarım bunları SİLER.");

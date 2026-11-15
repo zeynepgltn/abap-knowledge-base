@@ -9,6 +9,9 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
  public DbSet<Tag> Tags => Set<Tag>();
  public DbSet<NoteTag> NoteTags => Set<NoteTag>();
  public DbSet<Source> Sources => Set<Source>();
+ public DbSet<QuizDay> QuizDays => Set<QuizDay>();
+ public DbSet<QuizQuestion> QuizQuestions => Set<QuizQuestion>();
+ public DbSet<NoteReview> NoteReviews => Set<NoteReview>();
  protected override void OnModelCreating(ModelBuilder modelBuilder) {
    // Aramada Türkçe uyumlu, büyük/küçük harf duyarsız "içinde geçiyor mu" (bkz. SqliteSetup.cs).
    modelBuilder.HasDbFunction(typeof(TextMatch).GetMethod(nameof(TextMatch.Contains))!).HasName("tr_contains");
@@ -29,6 +32,13 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
    // Kaynak: aynı defter/bölüm veya dosya bir kez tutulur; kaynağı silinen notun kaynak bilgisi boşalır.
    modelBuilder.Entity<Source>().HasIndex(x=>new{x.Kind,x.Name,x.Section}).IsUnique();
    modelBuilder.Entity<Note>().HasOne(x=>x.Source).WithMany(x=>x.Notes).HasForeignKey(x=>x.SourceId).OnDelete(DeleteBehavior.SetNull);
+   // Quiz: her gün için tek quiz; soru silinen nottan bağımsız kalır; tekrar durumu notla birlikte silinir.
+   modelBuilder.Entity<QuizDay>().HasIndex(x=>x.Date).IsUnique();
+   modelBuilder.Entity<QuizQuestion>().HasOne(x=>x.QuizDay).WithMany(x=>x.Questions).HasForeignKey(x=>x.QuizDayId).OnDelete(DeleteBehavior.Cascade);
+   modelBuilder.Entity<QuizQuestion>().HasOne(x=>x.Note).WithMany().HasForeignKey(x=>x.NoteId).OnDelete(DeleteBehavior.SetNull);
+   modelBuilder.Entity<QuizQuestion>().HasIndex(x=>new{x.QuizDayId,x.Order}).IsUnique();
+   modelBuilder.Entity<NoteReview>().HasOne(x=>x.Note).WithOne().HasForeignKey<NoteReview>(x=>x.NoteId).OnDelete(DeleteBehavior.Cascade);
+   modelBuilder.Entity<NoteReview>().HasIndex(x=>x.DueDate);
  }
 }
 public static class CategorySeed {

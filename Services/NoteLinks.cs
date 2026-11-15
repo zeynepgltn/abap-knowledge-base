@@ -17,9 +17,12 @@ public sealed class NoteLinks {
   this.db = db; this.tags = tags; this.sources = sources;
  }
 
+ // Veritabanının benzersiz indeksi büyük/küçük harfe duyarlı: "ALV" ve "alv" ikisi birden varsa ilki kullanılır.
  public static async Task<NoteLinks> LoadAsync(NotesDbContext db) => new(db,
-  (await db.Tags.ToListAsync()).ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase),
-  (await db.Sources.ToListAsync()).ToDictionary(Key, StringComparer.OrdinalIgnoreCase));
+  (await db.Tags.OrderBy(t => t.Id).ToListAsync()).DistinctBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+   .ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase),
+  (await db.Sources.OrderBy(s => s.Id).ToListAsync()).DistinctBy(Key, StringComparer.OrdinalIgnoreCase)
+   .ToDictionary(Key, StringComparer.OrdinalIgnoreCase));
 
  private static string Key(Source s) => $"{s.Kind}|{s.Name}|{s.Section}";
 

@@ -1,0 +1,77 @@
+@model ABAPKnowledgeBase.Controllers.QuizPage
+@using ABAPKnowledgeBase.Services
+@using ABAPKnowledgeBase.Models
+@{
+ var day = Model.Day; var s = Model.Stats;
+ var answered = day.Questions.Count(q => q.Answered);
+ var correct = day.Questions.Count(q => q.Answered && q.IsCorrect);
+ string Level(string d) => d == QuizDifficulty.Easy ? "easy" : d == QuizDifficulty.Hard ? "hard" : "medium";
+}
+<div class="row-between quiz-head">
+ <div>
+  <h1>Günün Quiz'i</h1>
+  <p class="muted">@day.Date.ToString("d MMMM yyyy, dddd", new System.Globalization.CultureInfo("tr-TR")) · 3 mantık + 2 kod sorusu, notlarından üretildi.</p>
+ </div>
+ @if (answered == 0 && day.Questions.Count > 0) {
+  <form asp-action="Regenerate" method="post">@Html.AntiForgeryToken()<button type="submit" class="secondary" title="Henüz cevap vermediysen başka sorular üretir">↻ Başka sorular</button></form>
+ }
+</div>
+
+<div class="quiz-stats">
+ <div><b>@answered/@day.Questions.Count</b><span>bugün</span></div>
+ <div><b>🔥 @s.Streak</b><span>gün seri</span></div>
+ <div><b>%@s.Accuracy</b><span>toplam doğru (@s.Correct/@s.Answered)</span></div>
+ <div><b>@s.Unseen</b><span>hiç sorulmamış not</span></div>
+ <div class="quiz-boxes" title="Leitner kutuları: doğru cevapta not bir üst kutuya geçer ve daha seyrek sorulur (1, 2, 4, 8, 16 gün).">
+  @for (var b = 1; b <= QuizService.MaxBox; b++) { <span><i>K@(b)</i>@s.Boxes[b]</span> }
+  <em>kutulardaki not sayısı</em>
+ </div>
+</div>
+
+@if (day.Questions.Count == 0) {
+ <p class="reading-empty">Soru üretilecek kadar not bulunamadı. Notlarına “KAVRAM: açıklama” satırları veya kod blokları ekledikçe sorular oluşur.</p>
+}
+@if (day.CompletedAt is not null) {
+ <div class="quiz-done" role="status"><b>Bugünkü quiz bitti: @correct/@day.Questions.Count doğru.</b> Yanlış yaptığın notlar yarın tekrar gelecek, doğrular daha seyrek sorulacak.</div>
+}
+
+@foreach (var q in day.Questions) {
+ var choices = q.Choices;
+ <section class="quiz-card @(q.Answered ? (q.IsCorrect ? "is-correct" : "is-wrong") : "")" id="q@(q.Order)">
+  <div class="quiz-meta">
+   <span class="quiz-num">@q.Order</span>
+   <span class="quiz-tag">@q.Kind</span>
+   <span class="quiz-tag level-@Level(q.Difficulty)">@q.Difficulty</span>
+   @if (q.Answered) { <span class="quiz-result">@(q.IsCorrect ? "✓ Doğru" : "✗ Yanlış")</span> }
+  </div>
+  <p class="quiz-prompt">@q.Prompt</p>
+  @if (q.Code is not null) { <pre class="doc-code quiz-code"><code>@q.Code</code></pre> }
+  @if (!q.Answered) {
+   <form asp-action="Answer" method="post" class="quiz-choices">
+    @Html.AntiForgeryToken()<input type="hidden" name="id" value="@q.Id" />
+    @for (var i = 0; i < choices.Count; i++) {
+     <button type="submit" name="choice" value="@i" class="quiz-choice"><span class="quiz-letter">@((char)('A' + i))</span><span>@choices[i]</span></button>
+    }
+   </form>
+  } else {
+   <div class="quiz-choices">
+    @for (var i = 0; i < choices.Count; i++) {
+     var cls = i == q.CorrectIndex ? "right" : i == q.AnswerIndex ? "picked" : "";
+     <div class="quiz-choice @cls"><span class="quiz-letter">@((char)('A' + i))</span><span>@choices[i]</span></div>
+    }
+   </div>
+   <div class="quiz-explain">
+    <p>@q.Explanation</p>
+    <div class="row-between">
+     @if (q.Note is not null) { <a class="back-link" href="/?category=@q.Note.CategoryId&note=@q.Note.Id">📄 Nota git: @q.Note.Title</a> } else { <span></span> }
+     <form asp-action="Rate" method="post" class="quiz-rate">
+      @Html.AntiForgeryToken()<input type="hidden" name="id" value="@q.Id" />
+      <span class="muted">Soru iyi miydi?</span>
+      <button type="submit" name="rating" value="1" class="secondary @(q.Rating == 1 ? "on" : "")" aria-pressed="@(q.Rating == 1 ? "true" : "false")" title="İyi soru">👍</button>
+      <button type="submit" name="rating" value="-1" class="secondary @(q.Rating == -1 ? "on" : "")" aria-pressed="@(q.Rating == -1 ? "true" : "false")" title="Kötü soru (anlamsız, belirsiz veya yanlış)">👎</button>
+     </form>
+    </div>
+   </div>
+  }
+ </section>
+}

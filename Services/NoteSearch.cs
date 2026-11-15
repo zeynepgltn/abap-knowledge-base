@@ -1,4 +1,4 @@
-using System.Globalization;
+using ABAPKnowledgeBase.Data;
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Html;
@@ -14,9 +14,10 @@ namespace ABAPKnowledgeBase.Services;
 public static partial class NoteSearch {
  public sealed record Hit(Note Note, int Score, string Where, string Before, string Match, string After);
 
- private static readonly CompareInfo Compare = CultureInfo.InvariantCulture.CompareInfo;
+ // Veritabanı filtresiyle (TextMatch) aynı kural: büyük/küçük harf ve İ/I/ı/i farkı gözetilmez.
+ // Fold harf harf çevirir, metnin uzunluğu değişmez; bulunan konum orijinal metinde de geçerlidir.
  private static int Find(string? text, string term, int start = 0) =>
-  string.IsNullOrEmpty(text) || start >= text.Length ? -1 : Compare.IndexOf(text, term, start, CompareOptions.IgnoreCase);
+  string.IsNullOrEmpty(text) || start >= text.Length ? -1 : TextMatch.Fold(text).IndexOf(TextMatch.Fold(term), start, StringComparison.Ordinal);
  private static int Count(string? text, string term) {
   var count = 0;
   for (var i = Find(text, term); i >= 0 && count < 10; i = Find(text, term, i + term.Length)) count++;
@@ -35,7 +36,7 @@ public static partial class NoteSearch {
    var ocr = ocrByNote.GetValueOrDefault(note.Id);
    var tags = string.Join(", ", note.TagNames);
    var score = 0;
-   if (string.Equals(note.Title.Trim(), phrase, StringComparison.OrdinalIgnoreCase)) score += 100;
+   if (TextMatch.Fold(note.Title.Trim()) == TextMatch.Fold(phrase)) score += 100;
    else if (Find(note.Title, phrase) is var t && t >= 0) score += t == 0 ? 70 : 60;
    if (Find(tags, phrase) >= 0) score += 25;
    if (Find(note.Code, phrase) >= 0) score += 20;
