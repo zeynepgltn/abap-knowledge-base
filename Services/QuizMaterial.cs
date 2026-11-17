@@ -14,6 +14,10 @@ public sealed class NoteMaterial {
  public List<List<string>> CodeBlocks {get;}=[];
  // Başlık + düz metin + kod; "bu kavram notta geçiyor mu" kontrolü için.
  public string AllText {get;set;}="";
+ // Düz metindeki cümleler (kod blokları hariç); boşluk doldurma sorusu için.
+ public List<string> Sentences {get;}=[];
+ // TF-IDF anahtar terimleri, önemliden aza (ml/anahtar_terimler.py hesaplar). Hesaplanmadıysa boş.
+ public List<string> KeyTerms {get;init;}=[];
  public IEnumerable<QuizPair> Concepts => Pairs.Where(p => !p.IsCode);
  public IEnumerable<QuizPair> CodePairs => Pairs.Where(p => p.IsCode);
 }
@@ -54,8 +58,8 @@ public static partial class QuizMaterial {
  [GeneratedRegex(@"\s+")]
  private static partial Regex Spaces();
 
- public static NoteMaterial Extract(Note note, string category) {
-  var m = new NoteMaterial { Note = note, Category = category };
+ public static NoteMaterial Extract(Note note, string category, List<string>? keyTerms = null) {
+  var m = new NoteMaterial { Note = note, Category = category, KeyTerms = keyTerms ?? [] };
   var all = new List<string> { note.Title };
   foreach (var seg in NoteBody.Parse(note.Body)) {
    if (seg.Kind == NoteBody.Kind.Code) {
@@ -65,6 +69,7 @@ public static partial class QuizMaterial {
    } else if (seg.Kind == NoteBody.Kind.Text) {
     all.Add(seg.Text);
     ReadPairs(seg.Text, m.Pairs);
+    ReadSentences(seg.Text, m.Sentences);
    }
   }
   if (!string.IsNullOrWhiteSpace(note.Code)) {
@@ -97,6 +102,18 @@ public static partial class QuizMaterial {
    if (colon.Success) Add(pairs, colon.Groups["term"].Value, colon.Groups["def"].Value, minDef: 20);
   }
  }
+
+ // Satırları cümlelere böler; madde işaretleri atılır.
+ private static void ReadSentences(string text, List<string> sentences) {
+  foreach (var raw in text.Split('\n')) {
+   var line = Bullet().Replace(Spaces().Replace(Markup().Replace(raw, ""), " "), "").Trim();
+   foreach (var s in SentenceEnd().Split(line)) if (s.Trim().Length > 0) sentences.Add(s.Trim());
+  }
+ }
+ [GeneratedRegex(@"^\s*(?:[•\-\*·▪►●○◦]|\d{1,2}[.)])\s*")]
+ private static partial Regex Bullet();
+ [GeneratedRegex(@"(?<=[.!?])\s+(?=\p{Lu})")]
+ private static partial Regex SentenceEnd();
 
  private static void Add(List<QuizPair> pairs, string term, string def, int minDef) {
   term = Spaces().Replace(term, " ").Trim().TrimEnd('.', ',', ';').Trim();

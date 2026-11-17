@@ -29,3 +29,7 @@ appsettings.Development.json
 *.log
 Thumbs.db
 .DS_Store
+
+# Python sanal ortamı (ml/requirements.txt ile yeniden kurulur)
+ml/.venv/
+__pycache__/

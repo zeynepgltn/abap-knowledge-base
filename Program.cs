@@ -20,6 +20,7 @@ builder.Services.AddHostedService<BackupScheduler>();
 builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromMinutes(2));
 builder.Services.AddSingleton<ClassificationService>();
 builder.Services.AddScoped<QuizService>();
+builder.Services.AddSingleton<KeyTermsRunner>();
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment()) { app.UseExceptionHandler("/Error"); app.UseHsts(); }

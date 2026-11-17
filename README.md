@@ -87,17 +87,28 @@ Menüdeki **Günün Quiz'i** her gün notlardan 5 soru hazırlar: 3 mantık + 2 
 | # | Tür · Zorluk | Soru tipi |
 |---|---|---|
 | 1 | Mantık · Kolay | Açıklaması verilen kavram hangisi? |
-| 2 | Mantık · Orta | Kavramın doğru açıklaması hangisi? |
+| 2 | Mantık · Orta | Kavramın doğru açıklaması hangisi? ya da notun bir cümlesinde boşluğa hangi terim gelir? |
 | 3 | Mantık · Orta | Hangisi bu notun kavramlarından biri değil? |
 | 4 | Kod · Orta | Bu kod satırı ne yapar? (yoksa: boşluğa hangi anahtar kelime gelir?) |
 | 5 | Kod · Zor | Kod parçasındaki hatalı satır hangisi? |
 
 - **Sorular nereden gelir:** notlardaki `KAVRAM: açıklama` ve `KAVRAM | açıklama` satırları ile kod bloklarından, kurallarla (`Services/QuizMaterial.cs`, `Services/RuleQuizGenerator.cs`). Not ne kadar bu düzende yazılırsa sorular o kadar iyi olur.
+- **Anahtar terimler (aşama 2, TF-IDF):** `ml/anahtar_terimler.py` (Python, pandas, scikit-learn) her notun onu en iyi ayırt eden terimlerini bulup `NoteKeyTerms` tablosuna yazar. Boşluk doldurma sorusu bu terimlerden birini notun bir cümlesinde gizler; yanlış şıklar başka notların aynı yazım kalıbındaki terimleridir (işlem koduna işlem kodu: SE37 → SE14, SE11...). Böylece `KAVRAM: açıklama` düzeninde yazılmamış notlar da sorulabilir. Quiz hazırlanırken not eklenmiş/değişmişse betik otomatik çalışır; Python ortamı kurulu değilse quiz bu soru tipi olmadan çalışır.
 - **Aralıklı tekrar (Leitner):** doğru cevap notu bir üst kutuya taşır (1, 2, 4, 8, 16 gün sonra yeniden sorulur), yanlış cevap 1. kutuya geri gönderir. Önce yanlış bilinenler, sonra hiç sorulmamış notlar gelir.
 - **Gün boyu aynı quiz:** sorular veritabanına yazılır; yedekle diğer bilgisayara da geçer. Henüz cevap vermediysen **↻ Başka sorular** ile yenilenebilir.
 - **👍 / 👎:** her cevaptan sonra sorunun iyi olup olmadığını işaretle. Bu puanlar ileride soru kalitesini ölçmek ve makine öğrenmesi modeli eğitmek için veri seti olacak.
 - **Kapsam:** `appsettings.json` → `Quiz:ExcludeCategories` (varsayılan: Projeler, firmaya özel notlar).
 - **Önizleme:** `dotnet run -- --quiz-onizleme 7` kaydetmeden 7 günlük örnek quiz yazar.
+
+### Python ortamı (bir kez, her bilgisayarda)
+
+```powershell
+py -m venv ml\.venv
+ml\.venv\Scripts\python.exe -m pip install -r ml\requirements.txt
+ml\.venv\Scripts\python.exe ml\anahtar_terimler.py --onizle 5   # yazmadan 5 notun terimlerini gösterir
+```
+
+Elle çalıştırmak gerekmez; uygulama quiz hazırlarken gerekirse kendisi çalıştırır. Terimler notlardan türetildiği için her an yeniden hesaplanabilir.
 
 ## Yedekleme ve iki bilgisayar
 
@@ -173,6 +184,7 @@ Açık olsa bile tam aktarım (`--import-onenote --apply`, veritabanını silip 
 | NoteImages | Resimler ve resimlerden okunan yazı (OCR) |
 | QuizDays / QuizQuestions | Günlük quiz'ler, sorular, verilen cevaplar ve 👍/👎 puanları |
 | NoteReviews | Her notun aralıklı tekrar kutusu ve sonraki tekrar tarihi |
+| NoteKeyTerms | Notların TF-IDF anahtar terimleri (Python betiği yazar, quiz okur) |
 
 ## Bilinçli sınırlamalar
 

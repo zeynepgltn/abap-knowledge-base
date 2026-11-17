@@ -12,6 +12,7 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
  public DbSet<QuizDay> QuizDays => Set<QuizDay>();
  public DbSet<QuizQuestion> QuizQuestions => Set<QuizQuestion>();
  public DbSet<NoteReview> NoteReviews => Set<NoteReview>();
+ public DbSet<NoteKeyTerm> NoteKeyTerms => Set<NoteKeyTerm>();
  protected override void OnModelCreating(ModelBuilder modelBuilder) {
    // Aramada Türkçe uyumlu, büyük/küçük harf duyarsız "içinde geçiyor mu" (bkz. SqliteSetup.cs).
    modelBuilder.HasDbFunction(typeof(TextMatch).GetMethod(nameof(TextMatch.Contains))!).HasName("tr_contains");
@@ -39,6 +40,8 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
    modelBuilder.Entity<QuizQuestion>().HasIndex(x=>new{x.QuizDayId,x.Order}).IsUnique();
    modelBuilder.Entity<NoteReview>().HasOne(x=>x.Note).WithOne().HasForeignKey<NoteReview>(x=>x.NoteId).OnDelete(DeleteBehavior.Cascade);
    modelBuilder.Entity<NoteReview>().HasIndex(x=>x.DueDate);
+   modelBuilder.Entity<NoteKeyTerm>().HasKey(x=>new{x.NoteId,x.Rank});
+   modelBuilder.Entity<NoteKeyTerm>().HasOne(x=>x.Note).WithMany().HasForeignKey(x=>x.NoteId).OnDelete(DeleteBehavior.Cascade);
  }
 }
 public static class CategorySeed {

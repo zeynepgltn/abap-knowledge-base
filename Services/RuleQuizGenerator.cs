@@ -9,16 +9,20 @@ namespace ABAPKnowledgeBase.Services;
 ///
 /// Günün quiz'i: 3 mantık + 2 kod, 1 kolay + 3 orta + 1 zor.
 ///   1. Mantık · Kolay  "kavram-bul"   açıklaması verilen kavram hangisi?
-///   2. Mantık · Orta   "tanim-sec"    kavramın doğru açıklaması hangisi?
+///   2. Mantık · Orta   "tanim-sec"    kavramın doğru açıklaması hangisi?  (ya da "bosluk-doldur", aşağıda)
 ///   3. Mantık · Orta   "farkli-olan"  hangisi bu notun kavramlarından biri değil?
 ///   4. Kod · Orta      "kod-ne-yapar" bu kod satırı ne yapar?  (yoksa "kod-tamamla": boşluğa ne gelir?)
 ///   5. Kod · Zor       "hatali-satir" kod parçasındaki hatalı satır hangisi?
+///
+/// Aşama 2: "bosluk-doldur" notun bir cümlesinde TF-IDF ile bulunmuş anahtar terimi gizler
+/// (terimleri ml/anahtar_terimler.py hesaplar). Böylece "kavram: açıklama" düzeninde yazılmamış notlar da sorulabilir.
 ///
 /// Not seçimi (aralıklı tekrar): yanlış bilinip tekrarı gelmiş notlar önce, sonra hiç sorulmamışlar,
 /// sonra tekrarı gelmiş diğerleri (düşük kutu önce). Her soru farklı nottan, mümkünse farklı kategoriden.
 /// </summary>
 public sealed partial class RuleQuizGenerator(Random rng) {
- public const string Name = "kural-v1";
+ // v2: TF-IDF anahtar terimleriyle boşluk doldurma eklendi (quiz aşama 2).
+ public const string Name = "kural-v2";
 
  private sealed record Slot(string Kind, string Difficulty, Func<NoteMaterial, QuizQuestion?>[] Makers);
 
@@ -30,10 +34,12 @@ public sealed partial class RuleQuizGenerator(Random rng) {
    .Select(m => (m, priority: Priority(reviews.GetValueOrDefault(m.Note.Id), today), tie: rng.Next()))
    .OrderBy(x => x.priority).ThenBy(x => x.tie).Select(x => x.m).ToList();
 
+  // 2. soru günden güne boşluk doldurma ya da tanım seçme olur; biri çıkmazsa diğeri denenir.
+  Func<NoteMaterial, QuizQuestion?>[] second = rng.Next(2) == 0 ? [FillBlank, ChooseDefinition] : [ChooseDefinition, FillBlank];
   var slots = new Slot[] {
    new(QuizKind.Logic, QuizDifficulty.Easy, [FindConcept]),
-   new(QuizKind.Logic, QuizDifficulty.Medium, [ChooseDefinition]),
-   new(QuizKind.Logic, QuizDifficulty.Medium, [OddOneOut, ChooseDefinition]),
+   new(QuizKind.Logic, QuizDifficulty.Medium, second),
+   new(QuizKind.Logic, QuizDifficulty.Medium, [OddOneOut, ChooseDefinition, FillBlank]),
    new(QuizKind.Code, QuizDifficulty.Medium, [WhatDoesCodeDo, CompleteCode]),
    new(QuizKind.Code, QuizDifficulty.Hard, [FindWrongLine]),
   };
@@ -147,6 +153,82 @@ public sealed partial class RuleQuizGenerator(Random rng) {
  [GeneratedRegex(@"[^\p{L}\p{N}_]+")]
  private static partial Regex WordSplit();
  private static readonly HashSet<string> FillerWords = ["veya", "gibi", "için", "ile", "olan", "olarak", "daha", "kadar"];
+
+ // Orta (aşama 2): notun TF-IDF anahtar terimlerinden biri bir cümlede gizlenir, boşluğa hangisinin geleceği seçilir.
+ // Yanlış şıklar başka notların aynı biçimdeki anahtar terimleridir (önce aynı kategoriden).
+ private QuizQuestion? FillBlank(NoteMaterial m) {
+  var noteText = TextMatch.Fold(m.AllText);
+  foreach (var term in m.KeyTerms.Take(6).Where(t => BlankWorthy(t, m.AllText))) {
+   var rx = TermRegex(term);
+   var sentences = m.Sentences.Where(s => s.Length is >= 40 and <= 240 && rx.IsMatch(s) && !LooksLikeCode(s)).ToList();
+   if (sentences.Count == 0) continue;
+   var wrong = PickTerms(m, term, noteText);
+   if (wrong.Count < 3) continue;
+   foreach (var s in Shuffle(sentences)) {
+    var masked = rx.Replace(s, "▁▁▁▁");
+    // Boşluk dışında en az 5 kelime kalmalı; yoksa cümle ipucu vermez.
+    if (WordSplit().Split(masked.Replace("▁", " ")).Count(w => w.Length >= 2) < 5) continue;
+    var title = rx.Replace(m.Note.Title, "▁▁▁▁");
+    return Build("bosluk-doldur", $"“{title}” notundan bir cümle. Boşluğa hangisi gelmeli?\n\n“{masked}”", null, term, wrong,
+     $"Doğru cevap “{term}”; bu notu en iyi ayırt eden terimlerden biri. Notta: “{s}”");
+   }
+  }
+  return null;
+ }
+
+ // Boşluk yapılmaya değer terim mi? Teknik adlar (ALV, SELECTION-SCREEN, cl_salv_table) ya da cümle ortasında
+ // da büyük harfle yazılan özel adlar (Smartform, Field Catalog). "pencerenin" gibi çekimli sıradan kelimeler
+ // ve nota özgü değişken/Z nesnesi adları (lv_x, gs_sort-spos, ZGZ_P_...) elenir.
+ private static bool BlankWorthy(string term, string allText) {
+  if (term.Length is < 3 or > 40) return false;
+  if (LocalName().IsMatch(term)) return false;
+  if (Shape(term) == "kod") return true;
+  return char.IsUpper(term[0]) && Regex.IsMatch(allText, @"[\p{Ll}\d,]\s+" + Regex.Escape(term).Replace("\\ ", "\\s+") + @"(?![\w-])");
+ }
+ // ABAP değişken önekleri (lv_, GS_, it_, p_, s_, wa_, fs_...) ve müşteri nesneleri (Z*/Y*): büyük/küçük harf fark etmez.
+ [GeneratedRegex(@"^(?:[lgimecr][vstorfx]_|wa_|fs_|[ps]_|[ZY][A-Z0-9_]{3,}$)", RegexOptions.IgnoreCase)]
+ private static partial Regex LocalName();
+
+ private static Regex TermRegex(string term) =>
+  new($@"(?<![\w-]){Regex.Escape(term).Replace("\\ ", "\\s+")}(?![\w-])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+ private static bool LooksLikeCode(string s) =>
+  s.Contains("->") || s.Contains("=>") || s.Contains(" = ") || s.Contains("#(") || s.Contains("( )");
+
+ // Hepsi büyük harf (ALV, BOUND) ya da karışık (Smartform, cl_salv_table): şıklar aynı yazımda olmalı.
+ private static bool AllCaps(string t) => t == t.ToUpperInvariant();
+
+ // Yazım kalıbı: büyük harf → A, küçük → a, rakam → 9, tekrarlar tek sayılır. SE37 → "A9", SE16/SE16N → "A9/A9A",
+ // MODULE → "A", Field Catalog → "Aa Aa". Şıklar önce cevapla aynı kalıptan seçilir (işlem koduna işlem kodu).
+ private static string Pattern(string t) {
+  var sb = new System.Text.StringBuilder();
+  foreach (var c in t) {
+   var k = char.IsUpper(c) ? 'A' : char.IsLower(c) ? 'a' : char.IsDigit(c) ? '9' : c;
+   if (sb.Length == 0 || sb[^1] != k) sb.Append(k);
+  }
+  return sb.ToString();
+ }
+
+ // Yanlış şıklar: başka notların anahtar terimleri. Sıra: aynı kalıp + aynı kategori, aynı kalıp + diğer kategoriler,
+ // sonra sadece aynı biçim (kod/terim, büyük harf/karışık). Sıradan Türkçe kelimeler ("Müdür") şık olmasın diye
+ // kelime biçimindeki şıklar teknik terimlerdeki gibi sadece İngilizce harflerden oluşmalı.
+ private List<string> PickTerms(NoteMaterial m, string answer, string foldedNoteText) {
+  var shape = Shape(answer); var caps = AllCaps(answer); var pattern = Pattern(answer);
+  var sameCategory = pool.Where(o => o != m && o.Category == m.Category).ToList();
+  var otherCategory = pool.Where(o => o != m && o.Category != m.Category).ToList();
+  var picked = new List<string>();
+  foreach (var (notes, strict) in new[] { (sameCategory, true), (otherCategory, true), (sameCategory, false), (otherCategory, false) }) {
+   var candidates = notes.SelectMany(o => o.KeyTerms.Take(6).Where(t => BlankWorthy(t, o.AllText))).ToList();
+   foreach (var t in Shuffle(candidates)) {
+    if (Shape(t) != shape || AllCaps(t) != caps || (strict && Pattern(t) != pattern)) continue;
+    if (shape == "terim" && !t.All(c => c < 128)) continue;
+    if (Same(t, answer) || Related(foldedNoteText, t) || picked.Any(p => Same(p, t))) continue;
+    picked.Add(t);
+    if (picked.Count == 3) return picked;
+   }
+  }
+  return picked;
+ }
 
  // ---------- Kod soruları ----------
 

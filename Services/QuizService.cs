@@ -11,7 +11,7 @@ public sealed record QuizStats(int Streak, int Answered, int Correct, int[] Boxe
 /// Günün quiz'i: ilk açılışta 5 soru üretilip veritabanına yazılır, gün boyunca aynı quiz gösterilir.
 /// Cevaplar notların Leitner kutularını günceller (aralıklı tekrar).
 /// </summary>
-public sealed class QuizService(NotesDbContext db, IConfiguration config) {
+public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTermsRunner keyTerms) {
  // Kutu → kaç gün sonra yeniden sorulur. Kutu 1: ertesi gün, kutu 5: 16 gün sonra.
  private static readonly int[] Intervals = [0, 1, 2, 4, 8, 16];
  public const int MaxBox = 5;
@@ -53,6 +53,8 @@ public sealed class QuizService(NotesDbContext db, IConfiguration config) {
  public Task<List<QuizQuestion>> PreviewAsync(DateOnly date, int seed) => GenerateAsync(date, new Random(seed));
 
  private async Task<List<QuizQuestion>> GenerateAsync(DateOnly date, Random rng) {
+  // Not eklendi/değiştiyse anahtar terimler (TF-IDF) önce Python ile yeniden hesaplanır.
+  await keyTerms.RefreshIfStaleAsync(db);
   var pool = await LoadPoolAsync();
   var reviews = await db.NoteReviews.AsNoTracking().ToDictionaryAsync(r => r.NoteId);
   return new RuleQuizGenerator(rng).Generate(pool, reviews, date);
@@ -63,7 +65,10 @@ public sealed class QuizService(NotesDbContext db, IConfiguration config) {
   var excluded = config.GetSection("Quiz:ExcludeCategories").Get<string[]>() ?? [CategorySeed.Projects];
   var notes = await db.Notes.AsNoTracking().Include(n => n.Category)
    .Where(n => !excluded.Contains(n.Category!.Name)).ToListAsync();
-  return notes.Select(n => QuizMaterial.Extract(n, n.Category!.Name)).Where(m => m.Pairs.Count > 0 || m.CodeBlocks.Count > 0).ToList();
+  var terms = (await db.NoteKeyTerms.AsNoTracking().OrderBy(t => t.Rank).Select(t => new { t.NoteId, t.Term }).ToListAsync())
+   .GroupBy(t => t.NoteId).ToDictionary(g => g.Key, g => g.Select(t => t.Term).ToList());
+  return notes.Select(n => QuizMaterial.Extract(n, n.Category!.Name, terms.GetValueOrDefault(n.Id)))
+   .Where(m => m.Pairs.Count > 0 || m.CodeBlocks.Count > 0 || m.KeyTerms.Count > 0).ToList();
  }
 
  // Cevabı kaydeder ve notun tekrar kutusunu günceller. Bir soru sadece bir kez cevaplanır.
