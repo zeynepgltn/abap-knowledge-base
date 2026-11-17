@@ -12,6 +12,7 @@
     int totalNotes = ViewBag.TotalNotes ?? 0;
     var selectedNote = Model.FirstOrDefault(n => n.Id == selectedNoteId) ?? Model.FirstOrDefault();
     bool editing = ViewBag.Edit is true && selectedNote is not null;
+    bool creating = ViewBag.Create is true;
     // Projeler kategorisinin alt alanı: firmalar
     int? projectsId = ViewBag.ProjectsCategoryId;
     var companies = ViewBag.Companies as List<NotesController.CategoryOverview> ?? new();
@@ -80,7 +81,7 @@ else
             }
         </div>
     }
-    <div class="row-between"><a class="back-link" asp-action="Index">← Tüm kategoriler</a><a class="action" asp-action="Create" asp-route-category="@selectedCategory" asp-route-company="@selectedCompany">+ Yeni Not</a></div>
+    <div class="row-between"><a class="back-link" asp-action="Index">← Tüm kategoriler</a><a class="action" asp-action="Index" asp-route-category="@selectedCategory" asp-route-company="@selectedCompany" asp-route-q="@query" asp-route-create="true">+ Yeni Not</a></div>
     @* Üç kolon: soldan sağa kategoriler, sayfalar, not. *@
     <div class="reading-layout">
         <aside class="note-sidebar category-sidebar" aria-label="Kategoriler">
@@ -151,13 +152,26 @@ else
            </nav>
         </aside>
         <article class="note-document">
-          @if (editing)
+          @if (creating)
+          {
+              @* Yeni not sağ panelde açılır; kategori ve (Projeler'deyse) firma hazır seçilidir. *@
+              var draft = new Note { CategoryId = selectedCategory ?? 0, CompanyId = selectedCompany };
+              ViewBag.CancelUrl = Url.Action("Index", new { category = selectedCategory, q = query, company = selectedCompany, note = selectedNoteId });
+              <div class="doc-top"><span class="doc-kicker">Yeni not@(categoryName is null ? "" : $" · {categoryName}")@(companyName is null ? "" : $" › {companyName}")</span></div>
+              <form asp-action="Create" method="post" enctype="multipart/form-data" class="form-card inline-edit">
+                  @Html.AntiForgeryToken()
+                  <input type="hidden" name="inline" value="true" />
+                  @if (!string.IsNullOrWhiteSpace(query)) { <input type="hidden" name="returnQ" value="@query" /> }
+                  <partial name="_Fields" model="draft" />
+              </form>
+          }
+          else if (editing)
           {
               @* Düzenleme sağ panelde açılır; kaydet/vazgeç aynı sayfaya ve aynı nota döner. *@
               NoteLinks.FillText(selectedNote!);
               ViewBag.CancelUrl = Url.Action("Index", new { category = selectedCategory, q = query, company = selectedCompany, note = selectedNote!.Id });
               <div class="doc-top"><span class="doc-kicker">Notu düzenle</span></div>
-              <form asp-action="Edit" asp-route-id="@selectedNote.Id" method="post" class="form-card inline-edit">
+              <form asp-action="Edit" asp-route-id="@selectedNote.Id" method="post" enctype="multipart/form-data" class="form-card inline-edit">
                   @Html.AntiForgeryToken()
                   <input type="hidden" name="Id" value="@selectedNote.Id" />
                   <input type="hidden" name="inline" value="true" />

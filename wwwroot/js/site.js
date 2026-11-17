@@ -71,6 +71,52 @@ document.addEventListener('DOMContentLoaded',()=>{
   const sync=()=>{companyField.hidden=categorySelect.value!==categorySelect.dataset.projectsId;};
   categorySelect.addEventListener('change',sync); sync();
  }
+ // Nota resim ekleme: "Resim ekle" ile seç, açıklama kutusuna yapıştır (Ctrl+V) veya sürükle-bırak.
+ // Her resim formdaki dosya alanına "yeni-<no>.<uzantı>" adıyla eklenir ve imlecin yerine "[yeni-resim:<no>]" satırı yazılır;
+ // sunucu kaydederken bu satırı "[resim:N]" yapar. Önizlemedeki × resmi ve satırını kaldırır.
+ for(const tools of document.querySelectorAll('[data-image-tools]')){
+  const form=tools.closest('form'), input=tools.querySelector('[data-image-input]'), previews=tools.querySelector('[data-image-previews]');
+  const body=form?.querySelector('textarea[name="Body"]'); if(!form||!input||!body)continue;
+  const files=new DataTransfer(); let next=1;
+  const ext={'image/png':'png','image/jpeg':'jpg','image/gif':'gif','image/webp':'webp','image/bmp':'bmp'};
+  const insertLine=text=>{
+   const s=body.selectionStart??body.value.length, e=body.selectionEnd??s, v=body.value;
+   const pre=v.slice(0,s), post=v.slice(e);
+   const line=(pre&&!pre.endsWith('\n')?'\n':'')+text+(post.startsWith('\n')?'':'\n');
+   body.value=pre+line+post; const pos=pre.length+line.length; body.setSelectionRange(pos,pos); body.focus();
+  };
+  const add=file=>{
+   if(!ext[file.type]){alert(file.name+': sadece PNG, JPEG, GIF, WEBP veya BMP resim eklenebilir.');return;}
+   if(file.size>10*1024*1024){alert(file.name+': resim 10 MB\'tan büyük olamaz.');return;}
+   const no=next++, token='[yeni-resim:'+no+']';
+   const named=new File([file],'yeni-'+no+'.'+ext[file.type],{type:file.type});
+   files.items.add(named); input.files=files.files; insertLine(token);
+   const thumb=document.createElement('div'); thumb.className='image-thumb';
+   const img=document.createElement('img'); img.src=URL.createObjectURL(file); img.alt='Yeni resim '+no;
+   const remove=document.createElement('button'); remove.type='button'; remove.className='image-remove'; remove.textContent='×'; remove.title='Resmi kaldır';
+   const label=document.createElement('span'); label.textContent=token;
+   remove.addEventListener('click',()=>{
+    const i=[...files.files].findIndex(f=>f.name===named.name); if(i>=0)files.items.remove(i); input.files=files.files;
+    body.value=body.value.replace(new RegExp('^[ \\t]*'+token.replace(/[[\]]/g,'\\$&')+'[ \\t]*\\n?','m'),'');
+    URL.revokeObjectURL(img.src); thumb.remove();
+   });
+   thumb.append(img,remove,label); previews.append(thumb);
+  };
+  tools.querySelector('[data-image-pick]')?.addEventListener('click',()=>{
+   // Seçim penceresi dosya alanını sıfırlar: ayrı bir geçici alan kullanılır, seçilenler listeye eklenir.
+   const pick=document.createElement('input'); pick.type='file'; pick.accept=input.accept; pick.multiple=true;
+   pick.addEventListener('change',()=>{for(const f of pick.files)add(f);}); pick.click();
+  });
+  body.addEventListener('paste',e=>{
+   const images=[...(e.clipboardData?.files||[])].filter(f=>f.type.startsWith('image/'));
+   if(images.length===0)return; e.preventDefault(); images.forEach(add);
+  });
+  body.addEventListener('dragover',e=>{if([...e.dataTransfer.items].some(i=>i.kind==='file'))e.preventDefault();});
+  body.addEventListener('drop',e=>{
+   const images=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/'));
+   if(images.length===0)return; e.preventDefault(); body.focus(); images.forEach(add);
+  });
+ }
  const btn=document.querySelector('#suggestBtn'); if(!btn)return;
  btn.addEventListener('click',async()=>{
   const token=document.querySelector('input[name="__RequestVerificationToken"]')?.value;

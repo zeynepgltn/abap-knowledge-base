@@ -65,7 +65,9 @@ Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resi
 ## Özellikler
 
 - Not ekleme, düzenleme, silme (onaylı), listeleme ve detay görüntüleme
-- Üç kolonlu okuma ekranı (kategoriler, sayfalar, not) ve sağ panelde düzenleme
+- Üç kolonlu okuma ekranı (kategoriler, sayfalar, not); düzenleme ve yeni not sağ panelde açılır (bir kategori/firmadayken "+ Yeni Not" o kategori ve firma seçili gelir)
+- Notlara resim: "Resim ekle" ile seç, ekran görüntüsünü açıklama kutusuna yapıştır (Ctrl+V) veya sürükle-bırak; resim imlecin olduğu yere `[resim:N]` satırı olarak girer. Düzenlemede resimler önizlenir ve silinebilir (PNG/JPEG/GIF/WEBP/BMP, en fazla 10 MB)
+- Etiketler isteğe bağlı: metinde geçmeyen ama aramak isteyeceğin anahtarlar için (program/Tcode adı, proje, modül). Aramada etiket eşleşmesi metinden önde sıralanır ve arama sonuçlarında etiket filtresi olur
 - Projeler kategorisinde firmalara göre gruplama
 - Sayfaları sürükle-bırak ile sıralama
 - OneNote'tan resimleriyle aktarım; resimlerdeki yazıda (OCR) arama

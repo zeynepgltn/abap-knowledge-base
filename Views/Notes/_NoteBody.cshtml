@@ -9,8 +9,9 @@
             <pre class="doc-code"><code>@part.Text</code></pre>
             break;
         case NoteBody.Kind.Image:
+            @* v: not değişince adres de değişir; tarayıcı önbellekteki eski resmi göstermez. *@
             <img class="note-img" loading="lazy" alt="Not resmi @part.ImageOrder"
-                 src="@Url.Action("Image", "Notes", new { noteId = Model.Id, order = part.ImageOrder })" />
+                 src="@Url.Action("Image", "Notes", new { noteId = Model.Id, order = part.ImageOrder, v = Model.UpdatedAt.Ticks })" />
             break;
         default:
             <div class="body-text">@part.Text</div>

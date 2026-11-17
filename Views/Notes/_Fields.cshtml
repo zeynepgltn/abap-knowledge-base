@@ -1,11 +1,35 @@
 @model Note
+@using ABAPKnowledgeBase.Services
+@{ var existingImages = Model.Id > 0 ? NoteBody.Parse(Model.Body).Where(p => p.Kind == NoteBody.Kind.Image).Select(p => p.ImageOrder).Distinct().ToList() : new List<int>(); }
 <div asp-validation-summary="All" class="error"></div><label asp-for="Title">Başlık</label><input asp-for="Title" placeholder="Örn: ?= downcasting operatörü" required maxlength="180" />
 <label asp-for="Body">Açıklama / not</label><textarea asp-for="Body" rows="9" required placeholder="Ne işe yarar? Ne zaman kullanılır? ..."></textarea>
+@* Resimler: seç, açıklama kutusuna yapıştır (Ctrl+V) veya sürükle-bırak. Resim imlecin olduğu yere "[resim]" satırı olarak girer (site.js). *@
+<div class="image-tools" data-image-tools>
+ <button type="button" class="secondary" data-image-pick>🖼 Resim ekle</button>
+ <span class="muted">veya ekran görüntüsünü açıklama kutusuna yapıştır (Ctrl+V) / sürükle. Resim imlecin olduğu yerde görünür.</span>
+ <input type="file" name="newImages" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden data-image-input />
+ <div class="image-previews" data-image-previews></div>
+</div>
+@if (existingImages.Count > 0)
+{
+ <div class="image-existing">
+  <span class="muted">Nottaki resimler (silmek için işaretle):</span>
+  <div class="image-previews">
+  @foreach (var order in existingImages)
+  {
+   <label class="image-thumb">
+    <img src="@Url.Action("Image", "Notes", new { noteId = Model.Id, order, v = Model.UpdatedAt.Ticks })" alt="Resim @order" loading="lazy" />
+    <span><input type="checkbox" name="deleteImages" value="@order" /> [resim:@order] sil</span>
+   </label>
+  }
+  </div>
+ </div>
+}
 <label asp-for="Code">ABAP kodu (isteğe bağlı)</label><textarea asp-for="Code" rows="7" class="code-input" placeholder="DATA(...)"></textarea>
 <div class="row-between"><button type="button" class="secondary" id="suggestBtn">✦ Kategori öner</button><span class="muted">Öneriyi kontrol ederek sen onaylarsın.</span></div><div id="suggestions" class="suggestions"></div>
 <label asp-for="CategoryId">Ana kategori</label><select asp-for="CategoryId" asp-items="ViewBag.CategoryItems" id="CategoryId" data-projects-id="@ViewBag.ProjectsCategoryId"><option value="0">Kategori seç</option></select>
 @* Firma sadece Projeler kategorisi seçiliyken görünür (site.js). *@
 <div id="companyField" class="company-field"><label asp-for="CompanyId">Firma</label><select asp-for="CompanyId" asp-items="ViewBag.CompanyItems"><option value="">Firma yok</option></select></div>
-<label asp-for="TagsText">Etiketler (virgülle)</label><input asp-for="TagsText" placeholder="CAST, nesne referansı, downcasting" />
+<label asp-for="TagsText">Etiketler (isteğe bağlı, virgülle)</label><input asp-for="TagsText" placeholder="Örn: REUSE_ALV_GRID_DISPLAY, SE38, saka" />
 <div class="two"><div><label asp-for="SourceText">Kaynak (isteğe bağlı)</label><input asp-for="SourceText" placeholder="abap temel seviye.pdf" /></div><div><label asp-for="SourcePage">Sayfa</label><input asp-for="SourcePage" type="number" min="1" /></div></div>
 <div class="actions"><button type="submit">Notu kaydet</button><a href="@(ViewBag.CancelUrl as string ?? Url.Action("Index"))">Vazgeç</a></div>

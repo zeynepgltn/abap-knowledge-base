@@ -9,10 +9,12 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
  // edit=true: seçili not sağ panelde düzenleme formuyla açılır.
  // company: Projeler kategorisinde sadece o firmanın sayfaları listelenir.
  // tag: arama sonuçlarını bir etikete (OneNote bölümüne) daraltır.
- public async Task<IActionResult> Index(string? q, int? category, int? note, int? company, string? tag, bool edit = false) {
-  ViewBag.Edit = edit;
+ // create=true: sağ panelde, açık kategori/firma seçili yeni not formu açılır (ayrı sayfaya gitmeden).
+ public async Task<IActionResult> Index(string? q, int? category, int? note, int? company, string? tag, bool edit = false, bool create = false) {
+  ViewBag.Edit = edit && !create;
+  ViewBag.Create = create;
   ViewBag.SelectedTag = tag;
-  if (edit) await LoadCategories();
+  if (edit || create) await LoadCategories();
   // category=0 "kategori yok" demektir; filtre ve görünüm aynı değeri kullansın.
   if (category is <= 0) category = null;
   ViewBag.SelectedNote = note;
@@ -97,29 +99,81 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   await LoadCategories();
   return View(new Note { CategoryId = category ?? 0, CompanyId = company });
  }
- [HttpPost][ValidateAntiForgeryToken]
+ [HttpPost][ValidateAntiForgeryToken][RequestSizeLimit(MaxUploadBytes)][RequestFormLimits(MultipartBodyLengthLimit = MaxUploadBytes)]
  // Sadece formdaki alanlar bağlanır: Id, CreatedAt gibi alanlar dışarıdan gönderilse bile yok sayılır.
+ // inline=true: form okuma ekranının sağ panelinden geldi; kayıttan sonra yeni not kendi listesinde seçili açılır.
  public async Task<IActionResult> Create([Bind(nameof(Note.Title), nameof(Note.Body), nameof(Note.Code), nameof(Note.TagsText),
-   nameof(Note.CategoryId), nameof(Note.CompanyId), nameof(Note.SourceText), nameof(Note.SourcePage))] Note note) {
+   nameof(Note.CategoryId), nameof(Note.CompanyId), nameof(Note.SourceText), nameof(Note.SourcePage))] Note note,
+   List<IFormFile>? newImages, bool inline=false, string? returnQ=null) {
   if (!await db.Categories.AnyAsync(c=>c.Id==note.CategoryId)) ModelState.AddModelError(nameof(note.CategoryId),"Kategori seçmelisin");
   await CheckCompany(note);
-  if (!ModelState.IsValid) { await LoadCategories(); return View(note); }
+  var images = await ReadImagesAsync(newImages);
+  if (!ModelState.IsValid) {
+   await LoadCategories();
+   if (inline) { ViewBag.Inline = true; ViewBag.CancelUrl = Url.Action(nameof(Index), new { category = note.CategoryId > 0 ? note.CategoryId : (int?)null, company = note.CompanyId, q = returnQ }); }
+   return View(note);
+  }
   note.CreatedAt=note.UpdatedAt=DateTime.UtcNow;
   note.SortOrder=await NextSortOrder(note.CategoryId);
+  note.Body = AttachImages(note.Body, images, note.Images, firstOrder: 1);
   (await NoteLinks.LoadAsync(db)).Apply(note,note.TagsText,note.SourceText);
-  db.Notes.Add(note);await db.SaveChangesAsync();return RedirectToAction(nameof(Details),new{id=note.Id});
+  db.Notes.Add(note);await db.SaveChangesAsync();
+  if (inline) {
+   TempData["Flash"] = $"\"{note.Title}\" eklendi.";
+   return RedirectToAction(nameof(Index), new { category = note.CategoryId, company = note.CompanyId, note = note.Id });
+  }
+  return RedirectToAction(nameof(Details),new{id=note.Id});
+ }
+
+ // ---------- Resimler ----------
+ // Formdan gelen resimler: dosya seç, açıklama kutusuna yapıştır (Ctrl+V) veya sürükle-bırak (site.js).
+ // Tarayıcı her resme "yeni-<no>.<uzantı>" adını verir ve metne "[yeni-resim:<no>]" satırı koyar;
+ // kayıtta bu satır "[resim:<sıra>]" olur. Metinde yeri olmayan resim notun sonuna eklenir.
+ private const int MaxUploadBytes = 60 * 1024 * 1024, MaxImageBytes = 10 * 1024 * 1024;
+ private static readonly HashSet<string> ImageTypes = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"];
+ private sealed record UploadedImage(string? Token, string ContentType, byte[] Data);
+
+ private async Task<List<UploadedImage>> ReadImagesAsync(List<IFormFile>? files) {
+  var result = new List<UploadedImage>();
+  foreach (var file in files ?? []) {
+   if (file.Length == 0) continue;
+   if (!ImageTypes.Contains(file.ContentType)) { ModelState.AddModelError("newImages", $"{file.FileName}: sadece PNG, JPEG, GIF, WEBP veya BMP resim eklenebilir."); continue; }
+   if (file.Length > MaxImageBytes) { ModelState.AddModelError("newImages", $"{file.FileName}: resim 10 MB'tan büyük olamaz."); continue; }
+   using var ms = new MemoryStream();
+   await file.CopyToAsync(ms);
+   var token = System.Text.RegularExpressions.Regex.Match(file.FileName, @"^yeni-(\d+)\.");
+   result.Add(new UploadedImage(token.Success ? token.Groups[1].Value : null, file.ContentType, ms.ToArray()));
+  }
+  // Resim yüklenemezse form yeniden açılır; seçilen resimler tarayıcıda kaybolur, metindeki yer tutucular temizlenir.
+  return result;
+ }
+
+ // Yeni resimleri nota ekler ve metindeki yer tutucuları gerçek resim satırlarına çevirir.
+ private static string AttachImages(string body, List<UploadedImage> images, ICollection<NoteImage> target, int firstOrder) {
+  var order = firstOrder;
+  foreach (var img in images) {
+   target.Add(new NoteImage { Order = order, ContentType = img.ContentType, Data = img.Data });
+   var placeholder = img.Token is null ? null : $"[yeni-resim:{img.Token}]";
+   if (placeholder is not null && body.Contains(placeholder)) body = body.Replace(placeholder, $"[resim:{order}]");
+   else body = body.TrimEnd() + $"\n[resim:{order}]";
+   order++;
+  }
+  // Dosyası gelmeyen (ör. formdan kaldırılan) yer tutucular metinde kalmasın.
+  return System.Text.RegularExpressions.Regex.Replace(body, @"^[ \t]*\[yeni-resim:\d+\][ \t]*\r?\n?", "", System.Text.RegularExpressions.RegexOptions.Multiline);
  }
  public async Task<IActionResult> Edit(int id) {
   var note=await LoadForEdit(id); if(note is null)return NotFound();
   NoteLinks.FillText(note); await LoadCategories(); return View(note);
  }
  private Task<Note?> LoadForEdit(int id) => db.Notes.Include(n=>n.Source).Include(n=>n.NoteTags).ThenInclude(t=>t.Tag).FirstOrDefaultAsync(n=>n.Id==id);
- [HttpPost][ValidateAntiForgeryToken]
+ [HttpPost][ValidateAntiForgeryToken][RequestSizeLimit(MaxUploadBytes)][RequestFormLimits(MultipartBodyLengthLimit = MaxUploadBytes)]
  // inline=true: form okuma ekranının sağ panelinden geldi; kayıttan sonra aynı listeye ve nota dönülür.
- public async Task<IActionResult> Edit(int id,Note input,bool inline=false,int? returnCategory=null,string? returnQ=null,int? returnCompany=null) {
+ // newImages: eklenen resimler, deleteImages: silinmesi işaretlenen resimlerin sıra numaraları.
+ public async Task<IActionResult> Edit(int id,Note input,List<IFormFile>? newImages,int[]? deleteImages,bool inline=false,int? returnCategory=null,string? returnQ=null,int? returnCompany=null) {
   if(id!=input.Id)return BadRequest();
   if(!await db.Categories.AnyAsync(c=>c.Id==input.CategoryId))ModelState.AddModelError(nameof(input.CategoryId),"Kategori seçmelisin");
   await CheckCompany(input);
+  var images = await ReadImagesAsync(newImages);
   if(!ModelState.IsValid){
    await LoadCategories();
    // Hata olursa tam sayfa düzenleme gösterilir ama dönüş adresi korunur.
@@ -132,8 +186,22 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   if(note.CategoryId!=input.CategoryId)note.SortOrder=await NextSortOrder(input.CategoryId);
   note.Title=input.Title;note.Body=input.Body;note.Code=input.Code;note.CategoryId=input.CategoryId;note.CompanyId=input.CompanyId;
   note.SourcePage=input.SourcePage;note.UpdatedAt=DateTime.UtcNow;
+  // Silinen resimlerin satırları metinden de çıkarılır. Yeni resimler en büyük sıranın devamına eklenir
+  // (silinen sıra numarası tekrar kullanılmaz; tarayıcı önbelleği eski resmi göstermesin).
+  var removed = deleteImages?.Distinct().ToArray() ?? [];
+  // Resim silme ve not kaydı birlikte yapılır: biri başarısız olursa hiçbiri uygulanmaz.
+  await using var tx = await db.Database.BeginTransactionAsync();
+  if (removed.Length > 0) {
+   await db.NoteImages.Where(i => i.NoteId == id && removed.Contains(i.Order)).ExecuteDeleteAsync();
+   foreach (var order in removed)
+    note.Body = System.Text.RegularExpressions.Regex.Replace(note.Body, $@"^[ \t]*\[resim:{order}\][ \t]*\r?\n?", "", System.Text.RegularExpressions.RegexOptions.Multiline);
+  }
+  var maxOrder = await db.NoteImages.Where(i => i.NoteId == id).MaxAsync(i => (int?)i.Order) ?? 0;
+  if (removed.Length > 0) maxOrder = Math.Max(maxOrder, removed.Max());
+  note.Body = AttachImages(note.Body, images, note.Images, maxOrder + 1);
   (await NoteLinks.LoadAsync(db)).Apply(note,input.TagsText,input.SourceText);
   await db.SaveChangesAsync();
+  await tx.CommitAsync();
   await NoteLinks.RemoveOrphansAsync(db);
   if(inline){
    TempData["Flash"]=$"\"{note.Title}\" kaydedildi.";
