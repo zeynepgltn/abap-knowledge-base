@@ -1,0 +1,70 @@
+@model ABAPKnowledgeBase.Controllers.SubcategoriesController.Page
+@using ABAPKnowledgeBase.Services
+@{
+    var code = TCodes.ForCategory(Model.Category.Name);
+    ViewData["Title"] = $"{Model.Category.Name} alt kategorileri";
+    ViewData["TCode"] = code;
+    ViewData["Description"] = $"{Model.Category.Name} kategorisinin alt kategorileri ve notların yerleşimi.";
+    var suggested = Model.Notes.Count(n => n.Suggested);
+    // Seçim kutusundaki seçenekler: Genel, var olanlar, öneriler.
+    var options = new List<(string Value, string Label)> { ("", "Genel") };
+    options.AddRange(Model.Existing.Select(s => ($"id:{s.Id}", s.Name)));
+    options.AddRange(Model.Proposed.Select(p => ($"new:{p}", p + " (yeni)")));
+}
+<section class="screen-head">
+    <div class="screen-title"><span class="tcode">@code</span><h1>@Model.Category.Name <span class="hero-sub">› alt kategoriler</span></h1></div>
+    <p class="muted">@(suggested > 0
+        ? $"{suggested} not için başlığına bakarak öneri hazırladım; sarı işaretli satırlar öneri. Kontrol et, istediğini değiştir, sonra kaydet."
+        : "Notları alt kategorilere yerleştir. Seçmediğin notlar Genel'de kalır.")</p>
+</section>
+<a class="back-link" asp-controller="Notes" asp-action="Index" asp-route-category="@Model.Category.Id"><span aria-hidden="true">←</span> @Model.Category.Name</a>
+<form method="post" action="/Subcategories/@Model.Category.Id" class="subcat-form">
+    @Html.AntiForgeryToken()
+    <div class="subcat-grid">
+        <section class="form-card subcat-list" aria-labelledby="subcat-list-title">
+            <h2 id="subcat-list-title">Alt kategoriler</h2>
+            <ul>
+                <li class="subcat-row subcat-general"><span class="subcat-name">Genel</span><span class="subcat-note">alt kategorisi olmayan notlar</span></li>
+                @for (var i = 0; i < Model.Existing.Count; i++)
+                {
+                    var s = Model.Existing[i];
+                    <li class="subcat-row">
+                        <input type="hidden" name="subId" value="@s.Id" />
+                        <label class="sr-only" for="sub-@s.Id">Alt kategori adı</label>
+                        <input id="sub-@s.Id" name="subName" value="@s.Name" maxlength="80" required />
+                        <span class="subcat-count" title="Not sayısı">@s.Count</span>
+                        <label class="subcat-del"><input type="checkbox" name="subDelete" value="@s.Id" /> Sil</label>
+                    </li>
+                }
+                @foreach (var p in Model.Proposed)
+                {
+                    <li class="subcat-row is-proposed"><span class="subcat-name">@p</span><span class="subcat-flag">öneri</span><span class="subcat-count">@Model.Notes.Count(n => n.Selected == $"new:{p}")</span></li>
+                }
+                <li class="subcat-row subcat-new">
+                    <label class="sr-only" for="new-sub">Yeni alt kategori adı</label>
+                    <input id="new-sub" name="newName" maxlength="80" placeholder="+ Yeni alt kategori adı" />
+                </li>
+            </ul>
+            <p class="muted subcat-help">Önerilen bir alt kategori, en az bir not ona yerleştirilirse oluşur. Silinen alt kategorinin notları Genel'e düşer, not silinmez. Yeni yazdığın adı notlara kaydettikten sonra seçebilirsin.</p>
+        </section>
+        <section class="form-card subcat-notes" aria-labelledby="subcat-notes-title">
+            <div class="subcat-notes-head"><h2 id="subcat-notes-title">Notlar</h2><span class="muted">@Model.Notes.Count not</span></div>
+            <ol class="subcat-table">
+                @foreach (var n in Model.Notes)
+                {
+                    <li class="@(n.Suggested ? "is-suggested" : "")">
+                        <input type="hidden" name="noteId" value="@n.Id" />
+                        <label for="note-@n.Id">@n.Title@if (n.Suggested) { <span class="subcat-flag">öneri</span> }</label>
+                        <select id="note-@n.Id" name="noteSub">
+                            @foreach (var o in options)
+                            {
+                                <option value="@o.Value" selected="@(o.Value == n.Selected)">@o.Label</option>
+                            }
+                        </select>
+                    </li>
+                }
+            </ol>
+        </section>
+    </div>
+    <div class="subcat-actions actions"><button type="submit" class="action"><span>Kaydet</span></button><a asp-controller="Notes" asp-action="Index" asp-route-category="@Model.Category.Id">Vazgeç</a></div>
+</form>

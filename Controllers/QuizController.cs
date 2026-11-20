@@ -26,9 +26,8 @@ public class QuizController(QuizService quiz) : Controller {
 
  [HttpPost, ValidateAntiForgeryToken]
  public async Task<IActionResult> Regenerate() {
-  TempData["Flash"] = await quiz.RegenerateAsync(QuizService.Today)
-   ? "Yeni sorular üretildi."
-   : "Cevaplamaya başladığın quiz yenilenemez.";
+  var day = await quiz.RegenerateAsync(QuizService.Today);
+  TempData["Flash"] = day.Round > 1 ? $"Yeni quiz oluşturuldu ({day.Round}. tur). Önceki cevapların kaydedildi." : "Yeni quiz oluşturuldu.";
   return RedirectToAction(nameof(Index));
  }
 

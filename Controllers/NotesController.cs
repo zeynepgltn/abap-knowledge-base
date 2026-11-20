@@ -25,6 +25,14 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
    .Select(c => new CategoryOverview { Id = c.Id, Name = c.Name, NoteCount = c.Notes.Count })
    .ToListAsync();
   ViewBag.CategoryOverviews = categories;
+  // Komut alanı: işlem kodu (ZALV, ZQUIZ, /nZYENI...) yazıldıysa o ekrana gidilir, değilse arama yapılır.
+  if (!string.IsNullOrWhiteSpace(q) && category is null) {
+   if (TCodes.Resolve(q, categories.Select(c => (c.Id, c.Name))) is { } target) {
+    TempData["Flash"] = target.Message;
+    return LocalRedirect(target.Url);
+   }
+   if (TCodes.LooksLikeCode(q)) { TempData["Flash"] = $"{q.Trim().ToUpperInvariant()} işlem kodu yok; notlarda arandı."; TempData["FlashType"] = "W"; }
+  }
   ViewBag.TotalNotes = categories.Sum(c => c.NoteCount);
   ViewBag.CategoryName = categories.FirstOrDefault(c => c.Id == category)?.Name;
   // Var olmayan kategori Id'si boş bir "Arama sonuçları" sayfası yerine 404 verir.
@@ -40,13 +48,16 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   ViewBag.SelectedCompany = company;
   ViewBag.CompanyName = company is null ? null : (ViewBag.Companies as List<CategoryOverview>)!.FirstOrDefault(c => c.Id == company)?.Name;
   if (company.HasValue && ViewBag.CompanyName is null) return NotFound();
-  var notes = db.Notes.Include(n => n.Category).Include(n => n.Company).Include(n => n.Source)
+  var notes = db.Notes.Include(n => n.Category).Include(n => n.Company).Include(n => n.Source).Include(n => n.Subcategory)
    .Include(n => n.NoteTags).ThenInclude(t => t.Tag).AsSplitQuery().AsQueryable();
   if (company.HasValue) notes = notes.Where(n => n.CompanyId == company.Value);
   if (!string.IsNullOrWhiteSpace(q)) return View(await Search(notes, q, category, tag));
   if (!category.HasValue) return View(new List<Note>());
   // Kategori listesi elle verilen sırada gösterilir ve sürüklenerek sıralanabilir.
   ViewBag.CanReorder = true;
+  // Alt kategoriler: sayfa listesi bunlara göre gruplanır (boş olanlar da bırakma hedefi olarak görünür).
+  ViewBag.Subcategories = await db.Subcategories.Where(s => s.CategoryId == category.Value)
+   .OrderBy(s => s.SortOrder).ThenBy(s => s.Id).ToListAsync();
   notes = notes.Where(n => n.CategoryId == category.Value).OrderBy(n => n.SortOrder).ThenBy(n => n.Id);
   return View(await notes.Take(1000).ToListAsync());
  }
@@ -56,6 +67,8 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
  // sonuçlar daraltıldığında diğer seçenekler de görünsün.
  private async Task<List<Note>> Search(IQueryable<Note> notes, string q, int? category, string? tag) {
   var term = q.Trim();
+  // Sadece joker ("*", "+") yazıldıysa her şey eşleşirdi; harf içeren kelime yoksa sonuç yok.
+  if (NoteSearch.Words(term).Length == 0) { ViewBag.ResultTotal = ViewBag.ResultCount = 0; ViewBag.CategoryFacets = new List<CategoryOverview>(); ViewBag.TagFacets = new List<(string Tag, int Count)>(); ViewBag.SearchHits = new Dictionary<int, NoteSearch.Hit>(); return []; }
   foreach (var word in NoteSearch.Words(term)) {
    var w = word;
    // TextMatch.Contains: büyük/küçük harf ve İ/ı farkı gözetmez (SQLite'ta tr_contains).
@@ -85,7 +98,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   return hits.Take(200).Select(h => h.Note).ToList();
  }
  public async Task<IActionResult> Details(int id) {
-  var note=await db.Notes.Include(n=>n.Category).Include(n=>n.Company).Include(n=>n.Source).Include(n=>n.NoteTags).ThenInclude(t=>t.Tag).FirstOrDefaultAsync(n=>n.Id==id);
+  var note=await db.Notes.Include(n=>n.Category).Include(n=>n.Subcategory).Include(n=>n.Company).Include(n=>n.Source).Include(n=>n.NoteTags).ThenInclude(t=>t.Tag).FirstOrDefaultAsync(n=>n.Id==id);
   return note is null?NotFound():View(note);
  }
  // Not gövdesindeki "[resim:N]" satırlarının gösterdiği resim.
@@ -103,10 +116,11 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
  // Sadece formdaki alanlar bağlanır: Id, CreatedAt gibi alanlar dışarıdan gönderilse bile yok sayılır.
  // inline=true: form okuma ekranının sağ panelinden geldi; kayıttan sonra yeni not kendi listesinde seçili açılır.
  public async Task<IActionResult> Create([Bind(nameof(Note.Title), nameof(Note.Body), nameof(Note.Code), nameof(Note.TagsText),
-   nameof(Note.CategoryId), nameof(Note.CompanyId), nameof(Note.SourceText), nameof(Note.SourcePage))] Note note,
+   nameof(Note.CategoryId), nameof(Note.SubcategoryId), nameof(Note.CompanyId), nameof(Note.SourceText), nameof(Note.SourcePage))] Note note,
    List<IFormFile>? newImages, bool inline=false, string? returnQ=null) {
   if (!await db.Categories.AnyAsync(c=>c.Id==note.CategoryId)) ModelState.AddModelError(nameof(note.CategoryId),"Kategori seçmelisin");
   await CheckCompany(note);
+  await CheckSubcategory(note);
   var images = await ReadImagesAsync(newImages);
   if (!ModelState.IsValid) {
    await LoadCategories();
@@ -173,6 +187,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   if(id!=input.Id)return BadRequest();
   if(!await db.Categories.AnyAsync(c=>c.Id==input.CategoryId))ModelState.AddModelError(nameof(input.CategoryId),"Kategori seçmelisin");
   await CheckCompany(input);
+  await CheckSubcategory(input);
   var images = await ReadImagesAsync(newImages);
   if(!ModelState.IsValid){
    await LoadCategories();
@@ -184,7 +199,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   var note=await LoadForEdit(id);if(note is null)return NotFound();
   // Başka kategoriye taşınan not, yeni kategorisinin sonuna eklenir.
   if(note.CategoryId!=input.CategoryId)note.SortOrder=await NextSortOrder(input.CategoryId);
-  note.Title=input.Title;note.Body=input.Body;note.Code=input.Code;note.CategoryId=input.CategoryId;note.CompanyId=input.CompanyId;
+  note.Title=input.Title;note.Body=input.Body;note.Code=input.Code;note.CategoryId=input.CategoryId;note.SubcategoryId=input.SubcategoryId;note.CompanyId=input.CompanyId;
   note.SourcePage=input.SourcePage;note.UpdatedAt=DateTime.UtcNow;
   // Silinen resimlerin satırları metinden de çıkarılır. Yeni resimler en büyük sıranın devamına eklenir
   // (silinen sıra numarası tekrar kullanılmaz; tarayıcı önbelleği eski resmi göstermesin).
@@ -247,8 +262,8 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
  [HttpPost][ValidateAntiForgeryToken]
  public async Task<IActionResult> CreateCompany(string? name) {
   name = name?.Trim();
-  if (string.IsNullOrEmpty(name) || name.Length > 100) TempData["Flash"] = "Firma adı 1-100 karakter olmalı.";
-  else if (await db.Companies.AnyAsync(c => c.Name == name)) TempData["Flash"] = $"\"{name}\" adında bir firma zaten var.";
+  if (string.IsNullOrEmpty(name) || name.Length > 100) { TempData["Flash"] = "Firma adı 1-100 karakter olmalı."; TempData["FlashType"] = "W"; }
+  else if (await db.Companies.AnyAsync(c => c.Name == name)) { TempData["Flash"] = $"\"{name}\" adında bir firma zaten var."; TempData["FlashType"] = "W"; }
   else {
    var company = new Company { Name = name };
    db.Companies.Add(company); await db.SaveChangesAsync();
@@ -262,8 +277,8 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   var company = await db.Companies.FindAsync(id);
   if (company is null) return NotFound();
   name = name?.Trim();
-  if (string.IsNullOrEmpty(name) || name.Length > 100) TempData["Flash"] = "Firma adı 1-100 karakter olmalı.";
-  else if (await db.Companies.AnyAsync(c => c.Name == name && c.Id != id)) TempData["Flash"] = $"\"{name}\" adında bir firma zaten var.";
+  if (string.IsNullOrEmpty(name) || name.Length > 100) { TempData["Flash"] = "Firma adı 1-100 karakter olmalı."; TempData["FlashType"] = "W"; }
+  else if (await db.Companies.AnyAsync(c => c.Name == name && c.Id != id)) { TempData["Flash"] = $"\"{name}\" adında bir firma zaten var."; TempData["FlashType"] = "W"; }
   else { company.Name = name; await db.SaveChangesAsync(); TempData["Flash"] = $"Firma adı \"{name}\" olarak değiştirildi."; }
   return RedirectToAction(nameof(Index), new { category = await ProjectsId(), company = id });
  }
@@ -273,7 +288,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   var company = await db.Companies.FindAsync(id);
   if (company is null) return NotFound();
   if (await db.Notes.AnyAsync(n => n.CompanyId == id)) {
-   TempData["Flash"] = $"\"{company.Name}\" firmasında hâlâ sayfa var; önce sayfaları sil veya başka firmaya taşı.";
+   TempData["Flash"] = $"\"{company.Name}\" firmasında hâlâ sayfa var; önce sayfaları sil veya başka firmaya taşı."; TempData["FlashType"] = "W";
    return RedirectToAction(nameof(Index), new { category = await ProjectsId(), company = id });
   }
   db.Companies.Remove(company); await db.SaveChangesAsync();
@@ -288,6 +303,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   ViewBag.CategoryItems=new SelectList(await db.Categories.OrderBy(c=>c.Id).ToListAsync(),"Id","Name");
   ViewBag.CompanyItems=new SelectList((await db.Companies.ToListAsync()).OrderBy(c=>c.Name, TurkishOrder),"Id","Name");
   ViewBag.ProjectsCategoryId=await ProjectsId();
+  ViewBag.SubcategoryItems=await db.Subcategories.OrderBy(s=>s.CategoryId).ThenBy(s=>s.SortOrder).ThenBy(s=>s.Id).ToListAsync();
  }
  private static readonly StringComparer TurkishOrder = StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), ignoreCase: true);
  private async Task<int> NextSortOrder(int categoryId) => (await db.Notes.Where(n => n.CategoryId == categoryId).MaxAsync(n => (int?)n.SortOrder) ?? 0) + 1;
@@ -296,6 +312,10 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
  private async Task CheckCompany(Note note) {
   if (note.CategoryId != await ProjectsId()) { note.CompanyId = null; return; }
   if (note.CompanyId is int id && !await db.Companies.AnyAsync(c => c.Id == id)) ModelState.AddModelError(nameof(note.CompanyId), "Firma bulunamadı");
+ }
+ // Alt kategori notun kendi kategorisine ait olmalı; kategori değişince eski alt kategori düşer (Genel).
+ private async Task CheckSubcategory(Note note) {
+  if (note.SubcategoryId is int id && !await db.Subcategories.AnyAsync(s => s.Id == id && s.CategoryId == note.CategoryId)) note.SubcategoryId = null;
  }
  public sealed record SuggestRequest(string? Title,string? Body,string? Code);
  public sealed class CategoryOverview { public int Id {get;set;} public string Name {get;set;}=""; public int NoteCount {get;set;} }

@@ -1,0 +1,279 @@
+{
+  "url": "http://127.0.0.1:4400/__shoot-missing-page-1795005419507",
+  "errors": [],
+  "failed": [],
+  "desktop": {
+    "loadMs": 161,
+    "loaderMs": null,
+    "settledMs": 2472,
+    "vitals": {
+      "lcpMs": 188,
+      "lcpElement": "p",
+      "cls": 0.001
+    },
+    "height": 900,
+    "overflowX": false,
+    "offenders": [],
+    "h1": [
+      "Bulunamadı"
+    ],
+    "smallTargets": [
+      "Notlarım 54x22",
+      "Günün Quiz'i 80x22",
+      "📌\nYapışkan Notlar 124x22",
+      "Renk: Sarı 12x12",
+      "Renk: Pembe 12x12",
+      "Renk: Yeşil 12x12",
+      "Renk: Mavi 12x12",
+      "Renk: Mor 12x12"
+    ],
+    "glHidden": [],
+    "title": "ABAP Bilgi Bankası",
+    "glOn": false,
+    "scrollFps": {
+      "fps": 60,
+      "worstFrameMs": 17
+    },
+    "nav": {
+      "href": "/",
+      "scrollYAfter": 0,
+      "title": "ABAP Bilgi Bankası"
+    },
+    "idleMotion": false,
+    "idleAt": null
+  },
+  "mobile": {
+    "throttled": true,
+    "loadMs": 1051,
+    "loaderMs": null,
+    "settledMs": 3106,
+    "vitals": {
+      "lcpMs": 1056,
+      "lcpElement": "p",
+      "cls": 0
+    },
+    "height": 844,
+    "overflowX": false,
+    "offenders": [],
+    "h1": [
+      "Bulunamadı"
+    ],
+    "smallTargets": [
+      "Günün Quiz'i 80x22",
+      "📌 19x22",
+      "Renk: Sarı 12x12",
+      "Renk: Pembe 12x12",
+      "Renk: Yeşil 12x12",
+      "Renk: Mavi 12x12",
+      "Renk: Mor 12x12",
+      "Renk: Turuncu 12x12"
+    ],
+    "glHidden": [],
+    "title": "ABAP Bilgi Bankası",
+    "glOn": false,
+    "scrollFps": {
+      "fps": 60,
+      "worstFrameMs": 18
+    }
+  },
+  "files": [
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-00-firstpaint.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-01-hero.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-02-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-03-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-04-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-05-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-06-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-07-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-90-transition-a.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-90-transition-b.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-90-transition-c.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-91-after-nav.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\d-92-back.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\k-01-focus.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\k-02-focus.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\k-03-focus.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\k-04-focus.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-01-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-01-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-02-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-02-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-03-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-03-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-04-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-04-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-05-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-05-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-06-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-06-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-07-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-07-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-08-rest.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\h-08-hover.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\m-01-hero.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\m-02-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\m-03-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\m-04-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\m-05-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\m-06-scroll.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\r-01-hero.png",
+    "C:\\not uygulamam\\.jury\\127.0.0.1-4400\\shots\\404\\r-02-mid.png"
+  ],
+  "notes": [
+    "desktop FPS runs headless on a software GPU: treat it as a floor, not a measurement of real hardware",
+    "mobile runs at 4x CPU slowdown on slow 4G: mobile.vitals and mobile.scrollFps are the numbers that count",
+    "loadMs: ms from navigation to the load event, null if it had not fired after 30 s (desktop) or 60 s (phone); a heavy page takes long, while visitors see content at vitals.lcpMs. loaderMs: ms until the #loader ended, null when the page has none",
+    "settledMs: ms from navigation by which the first screen stopped changing, never before the fixed wait. null: still changing at the cap, either a long intro or continuous motion (a live shader, video); d-01-hero / m-01-hero tell which. reduced.moving: the screen was still changing 1.5 s after load with reduced motion on"
+  ],
+  "keyboard": {
+    "stops": [
+      "a \"◈ ABAP Bilgi Bankası\"",
+      "button \"☾\"",
+      "a \"Notlarım\"",
+      "a \"Günün Quiz'i\"",
+      "a \"+ Yeni Not\"",
+      "button \"📌 Yapışkan Notlar\"",
+      "a \"← Notlarıma dön\"",
+      "button \"+\"",
+      "button \"⇥\"",
+      "textarea \"Not\"",
+      "button \"⠿\"",
+      "button \"Renk: Sarı\""
+    ],
+    "skipLinkFirst": false,
+    "noVisibleFocus": [
+      "textarea \"Not\"",
+      "button \"Renk: Sarı\""
+    ],
+    "invisibleFocus": [],
+    "stuck": false
+  },
+  "hover": {
+    "targets": [
+      {
+        "shot": "h-01",
+        "label": "button \"☾\"",
+        "interactive": true,
+        "primary": true,
+        "react": "color",
+        "changed": [
+          "color",
+          "backgroundColor",
+          "textDecorationColor",
+          "borderColor"
+        ]
+      },
+      {
+        "shot": "h-02",
+        "label": "button \"📌 Yapışkan Notlar\"",
+        "interactive": true,
+        "primary": true,
+        "react": "color",
+        "changed": [
+          "color",
+          "borderColor",
+          "textDecorationColor"
+        ]
+      },
+      {
+        "shot": "h-03",
+        "label": "button \"+\"",
+        "interactive": true,
+        "primary": true,
+        "react": "color",
+        "changed": [
+          "color",
+          "borderColor",
+          "textDecorationColor"
+        ]
+      },
+      {
+        "shot": "h-04",
+        "label": "button \"⇥\"",
+        "interactive": true,
+        "primary": true,
+        "react": "color",
+        "changed": [
+          "color",
+          "borderColor",
+          "textDecorationColor"
+        ]
+      },
+      {
+        "shot": "h-05",
+        "label": "button \"⠿\"",
+        "interactive": true,
+        "primary": false,
+        "react": "moves",
+        "changed": [
+          "backgroundColor",
+          "opacity"
+        ]
+      },
+      {
+        "shot": "h-06",
+        "label": "button \"Renk: Sarı\"",
+        "interactive": true,
+        "primary": false,
+        "react": "pixels",
+        "changed": []
+      },
+      {
+        "shot": "h-07",
+        "label": "button \"Renk: Pembe\"",
+        "interactive": true,
+        "primary": false,
+        "react": "pixels",
+        "changed": []
+      },
+      {
+        "shot": "h-08",
+        "label": "button \"Renk: Yeşil\"",
+        "interactive": true,
+        "primary": false,
+        "react": "pixels",
+        "changed": []
+      }
+    ],
+    "noHoverChange": [],
+    "colorOnly": [
+      "h-01 button \"☾\"",
+      "h-02 button \"📌 Yapışkan Notlar\"",
+      "h-03 button \"+\"",
+      "h-04 button \"⇥\""
+    ],
+    "covered": [],
+    "cursorFollower": false
+  },
+  "reduced": {
+    "hiddenText": 0,
+    "moving": false
+  },
+  "a11y": {
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "count": 4,
+        "nodes": [
+          "p:nth-child(3) (#85818b on #f8f6f8, 3.54:1, needs 4.5:1)",
+          "body > footer (#85818b on #f8f6f8, 3.54:1, needs 4.5:1)",
+          ".sticky-dock-head > b (#85818b on #f8f6f8, 3.54:1, needs 4.5:1)",
+          ".sticky-meta (#827a5b on #fff3b0, 3.82:1, needs 4.5:1)"
+        ]
+      },
+      {
+        "id": "label-content-name-mismatch",
+        "impact": "serious",
+        "help": "Elements must have their visible text as part of their accessible name",
+        "count": 1,
+        "nodes": [
+          ".nav-sticky"
+        ]
+      }
+    ],
+    "serious": 2,
+    "contrastNeedsReview": 5
+  }
+}

@@ -75,27 +75,32 @@ Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resi
 - 10 ABAP kategorisi + Projeler; ABAP terimlerine dayalı kategori önerisi (tam kelime eşleşmesi, ağırlıklı puan, kullanıcı onaylı)
 - Teknik sembolleri de (`?=`, `VALUE #(`) arayan arama: en ilgili sonuç üstte (başlık > etiket > kod > metin > resimdeki yazı), her sonuçta vurgulu pasaj, kategori ve etiket filtreleri; açılan notta eşleşmeler işaretlenir
 - Arama kabul testi: uygulama açıkken `powershell -ExecutionPolicy Bypass -File scripts\Test-Search.ps1` → `tests/arama-testleri.json`'daki sorgularda beklenen not ilk 5'te mi ölçer
-- Etiketler ve kaynaklar ayrı tablolarda: bir etiket birçok notta kullanılır; kaynak OneNote bölümü (`OneNote: defter › bölüm`) veya dosya adıdır, formda metin olarak girilir
+- Etiketler ve kaynaklar ayrı tablolarda: bir etiket birçok notta kullanılır; kaynak OneNote bölümü (`OneNote: defter › bölüm`), dosya adı veya web adresidir, formda metin olarak girilir. `https://...` ya da `www.` ile başlayan kaynak notta tıklanabilir link olur (yeni sekmede açılır)
+- 📌 Yapışkan Notlar: OneNote'taki gibi her sayfanın sağında, üst menünün altında sabit bir sütun (kartlarda renkli üst şerit; renk noktaları kartın üstüne gelince görünür); ABAP notlarından ayrı, aktivite ve yapılacak notları için. Yazdıkça kaydedilir; 6 renk, ✓ tamamlandı (sona iner), ⠿ ile sürükleyip sıralama. ⇥ ile kapatılır (kenarda 📌 sekmesi kalır, seçim hatırlanır); 1200 pikselden dar ekranda kapalı başlar, 📌 ile içeriğin üstüne açılır. Notlar veritabanında durur, yedekle diğer bilgisayara da geçer
 - 404 / hata durumunda uygulamanın kendi hata sayfası
 - Otomatik yedek: günlük + not kaydedince + kapanışta; son 14 gün yerelde ve OneDrive'da; iki bilgisayar arasında otomatik aktarım
 - Günün Quiz'i (aşağıda)
 
 ## Günün Quiz'i
 
-Menüdeki **Günün Quiz'i** her gün notlardan 5 soru hazırlar: 3 mantık + 2 kod; 1 kolay + 3 orta + 1 zor. Ücretli servis kullanmaz, tamamen yerel çalışır.
+Menüdeki **Günün Quiz'i** her gün notlardan 8 soru hazırlar: 5 mantık + 3 kod; 2 kolay + 5 orta + 1 zor. Ücretli servis kullanmaz, tamamen yerel çalışır.
 
 | # | Tür · Zorluk | Soru tipi |
 |---|---|---|
-| 1 | Mantık · Kolay | Açıklaması verilen kavram hangisi? |
-| 2 | Mantık · Orta | Kavramın doğru açıklaması hangisi? ya da notun bir cümlesinde boşluğa hangi terim gelir? |
-| 3 | Mantık · Orta | Hangisi bu notun kavramlarından biri değil? |
-| 4 | Kod · Orta | Bu kod satırı ne yapar? (yoksa: boşluğa hangi anahtar kelime gelir?) |
-| 5 | Kod · Zor | Kod parçasındaki hatalı satır hangisi? |
+| 1–2 | Mantık · Kolay | Açıklaması verilen kavram hangisi? |
+| 3 | Mantık · Orta | Notun bir cümlesinde boşluğa hangi terim gelir? |
+| 4 | Mantık · Orta | Kavramın doğru açıklaması hangisi? |
+| 5 | Mantık · Orta | Hangisi bu notun kavramlarından biri değil? |
+| 6–7 | Kod · Orta | Bu kod satırı ne yapar? / Koddaki boşluğa hangi anahtar kelime gelir? |
+| 8 | Kod · Zor | Kod parçasındaki hatalı satır hangisi? |
+
+Bir tip için uygun not bulunamazsa o yerde başka bir tip sorulur.
 
 - **Sorular nereden gelir:** notlardaki `KAVRAM: açıklama` ve `KAVRAM | açıklama` satırları ile kod bloklarından, kurallarla (`Services/QuizMaterial.cs`, `Services/RuleQuizGenerator.cs`). Not ne kadar bu düzende yazılırsa sorular o kadar iyi olur.
 - **Anahtar terimler (aşama 2, TF-IDF):** `ml/anahtar_terimler.py` (Python, pandas, scikit-learn) her notun onu en iyi ayırt eden terimlerini bulup `NoteKeyTerms` tablosuna yazar. Boşluk doldurma sorusu bu terimlerden birini notun bir cümlesinde gizler; yanlış şıklar başka notların aynı yazım kalıbındaki terimleridir (işlem koduna işlem kodu: SE37 → SE14, SE11...). Böylece `KAVRAM: açıklama` düzeninde yazılmamış notlar da sorulabilir. Quiz hazırlanırken not eklenmiş/değişmişse betik otomatik çalışır; Python ortamı kurulu değilse quiz bu soru tipi olmadan çalışır.
 - **Aralıklı tekrar (Leitner):** doğru cevap notu bir üst kutuya taşır (1, 2, 4, 8, 16 gün sonra yeniden sorulur), yanlış cevap 1. kutuya geri gönderir. Önce yanlış bilinenler, sonra hiç sorulmamış notlar gelir.
-- **Gün boyu aynı quiz:** sorular veritabanına yazılır; yedekle diğer bilgisayara da geçer. Henüz cevap vermediysen **↻ Başka sorular** ile yenilenebilir.
+- **Gün boyu aynı quiz:** sorular veritabanına yazılır; yedekle diğer bilgisayara da geçer.
+- **↻ Yeni quiz:** istediğin an yeni 8 soru. Hiç cevap vermediysen sorular yerinde yenilenir; cevap verdiysen aynı gün yeni bir tur açılır (2. tur, 3. tur...). Cevapladığın sorular ve 👍/👎 puanları kaydedilir, cevaplanmamışlar silinir (yarım quiz'de önce onay sorulur). O gün sorulmuş notlar yeni turda tekrar sorulmaz.
 - **👍 / 👎:** her cevaptan sonra sorunun iyi olup olmadığını işaretle. Bu puanlar ileride soru kalitesini ölçmek ve makine öğrenmesi modeli eğitmek için veri seti olacak.
 - **Kapsam:** `appsettings.json` → `Quiz:ExcludeCategories` (varsayılan: Projeler, firmaya özel notlar).
 - **Önizleme:** `dotnet run -- --quiz-onizleme 7` kaydetmeden 7 günlük örnek quiz yazar.
@@ -180,11 +185,12 @@ Açık olsa bile tam aktarım (`--import-onenote --apply`, veritabanını silip 
 | Categories | 10 ABAP kategorisi + Projeler |
 | Companies | Projeler kategorisindeki firmalar |
 | Tags / NoteTags | Etiketler ve not–etiket bağlantıları (çoka çok) |
-| Sources | Notların kaynağı: OneNote defter + bölüm veya dosya adı |
+| Sources | Notların kaynağı: OneNote defter + bölüm, dosya adı veya web adresi |
 | NoteImages | Resimler ve resimlerden okunan yazı (OCR) |
-| QuizDays / QuizQuestions | Günlük quiz'ler, sorular, verilen cevaplar ve 👍/👎 puanları |
+| QuizDays / QuizQuestions | Günlük quiz'ler (gün + tur), sorular, verilen cevaplar ve 👍/👎 puanları |
 | NoteReviews | Her notun aralıklı tekrar kutusu ve sonraki tekrar tarihi |
 | NoteKeyTerms | Notların TF-IDF anahtar terimleri (Python betiği yazar, quiz okur) |
+| StickyNotes | Yapışkan notlar: metin, renk, tamamlandı, panodaki sıra |
 
 ## Bilinçli sınırlamalar
 

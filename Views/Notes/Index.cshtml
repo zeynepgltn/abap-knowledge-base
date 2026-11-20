@@ -1,6 +1,7 @@
 @model List<ABAPKnowledgeBase.Models.Note>
 @using ABAPKnowledgeBase.Controllers
 @using ABAPKnowledgeBase.Services
+@using ABAPKnowledgeBase.Models
 @using System.Linq
 @{
     var categories = ViewBag.CategoryOverviews as List<NotesController.CategoryOverview> ?? new();
@@ -19,6 +20,24 @@
     int? selectedCompany = ViewBag.SelectedCompany;
     string? companyName = ViewBag.CompanyName;
     bool canReorder = ViewBag.CanReorder is true;
+    // Alt kategoriler: kategori açıkken (arama değilken) sayfalar alt kategori başlıkları altında gruplanır.
+    // Liste sırası: önce Genel (alt kategorisi olmayanlar, varsa), sonra alt kategoriler kendi sırasıyla.
+    var subcategories = ViewBag.Subcategories as List<Subcategory> ?? new();
+    bool grouped = subcategories.Count > 0;
+    var listItems = new List<(Subcategory? Group, bool IsHead, Note? Note, int Count)>();
+    if (grouped)
+    {
+        var general = Model.Where(n => n.SubcategoryId is null).ToList();
+        listItems.Add((null, true, null, general.Count));
+        listItems.AddRange(general.Select(n => ((Subcategory?)null, false, (Note?)n, 0)));
+        foreach (var s in subcategories)
+        {
+            var inGroup = Model.Where(n => n.SubcategoryId == s.Id).ToList();
+            listItems.Add((s, true, null, inGroup.Count));
+            listItems.AddRange(inGroup.Select(n => ((Subcategory?)s, false, (Note?)n, 0)));
+        }
+    }
+    else listItems.AddRange(Model.Select(n => ((Subcategory?)null, false, (Note?)n, 0)));
     // Arama: sonuç sayıları, filtre seçenekleri ve her sonucun pasajı
     bool searching = !string.IsNullOrWhiteSpace(query);
     string? selectedTag = ViewBag.SelectedTag;
@@ -28,32 +47,46 @@
     int resultTotal = ViewBag.ResultTotal ?? 0;
     int resultCount = ViewBag.ResultCount ?? 0;
     if (isListing) { ViewData["Wide"] = true; }
+    var categoryCode = categoryName is null ? null : TCodes.ForCategory(categoryName);
+    ViewData["Home"] = !isListing;
+    ViewData["TCode"] = categoryCode ?? TCodes.Home;
+    ViewData["Title"] = searching ? $"“{query!.Trim()}” araması" : isListing ? (selectedNote is not null ? $"{selectedNote.Title} · {categoryName}" : categoryName) : "Notlarım";
+    ViewData["Description"] = searching ? $"“{query!.Trim()}” için {resultCount} not bulundu."
+        : isListing ? $"{categoryName}: {Model.Count} sayfa ABAP notu." + (selectedNote is not null ? $" Açık not: {selectedNote.Title}." : "")
+        : $"{categories.Count} kategoride {totalNotes} ABAP notu. İşlem koduyla git ya da ara.";
 }
 @if (!isListing)
 {
-    <section class="hero"><p class="eyebrow">KİŞİSEL ABAP BİLGİ BANKASI</p><h1>Notlarım</h1><p>Bir kategori seç veya bütün notlarında ara.</p></section>
-    <form method="get" asp-controller="Notes" asp-action="Index" class="search">
-       <input type="search" name="q" placeholder="Notlarda ara: VALUE #(, ?=, ALV, BAPI..." aria-label="Notlarda ara" />
-       <button type="submit">Ara</button>
-    </form>
-    <div class="row-between category-heading"><div><h2>Kategoriler</h2><p class="muted">@categories.Count kategori · @totalNotes not</p></div><a class="action" asp-action="Create">+ Yeni Not</a></div>
-    <div class="category-grid">
-    @for (var i = 0; i < categories.Count; i++)
-    {
-        var c = categories[i];
-        <a class="category-card" asp-action="Index" asp-route-category="@c.Id">
-            <span class="category-icon">@(new[] { "AB", "IT", "SQL", "OO", "ALV", "API", "FRM", "XLS", "DBG", "SAP", "PRJ" }[i % 11])</span>
-            <span class="category-text"><h3>@c.Name</h3><span class="category-count">@c.NoteCount not</span></span>
-            <span class="category-arrow">→</span>
-        </a>
-    }
-    </div>
+    @* Ana ekran (SAP Easy Access gibi): büyük komut alanı ve Z-kodlu kategori indeksi. *@
+    <section class="home-hero" aria-labelledby="home-title">
+        <h1 id="home-title" class="display">Ne açalım?</h1>
+        <form method="get" action="/" class="okcode okcode-xl" role="search" data-okcode-form>
+            <label class="sr-only" for="okcode-home">İşlem kodu veya arama</label>
+            <input id="okcode-home" name="q" list="tcodes" autocomplete="off" spellcheck="false" placeholder="ZALV, REDUCE, ?= …" data-okcode />
+            <span class="okcode-caret" aria-hidden="true"></span>
+            <button type="submit" class="action"><span>Çalıştır</span></button>
+        </form>
+        <p class="home-hints"><kbd>ZQUIZ</kbd> günün quiz'i <kbd>ZYENI</kbd> yeni not <span class="hint-key"><kbd>/</kbd> her ekrandan bu alana getirir</span></p>
+    </section>
+    <section class="tindex" aria-labelledby="tindex-title">
+        <div class="tindex-head"><h2 id="tindex-title">Kategoriler</h2><p class="muted">@categories.Count kategori, @totalNotes not</p></div>
+        <ul class="tindex-list">
+        @foreach (var c in categories)
+        {
+            <li><a class="trow" asp-action="Index" asp-route-category="@c.Id"><span class="tcode">@TCodes.ForCategory(c.Name)</span><span class="trow-name">@c.Name</span><span class="trow-count">@c.NoteCount<span class="sr-only"> not</span></span><span class="trow-go" aria-hidden="true">↵</span></a></li>
+        }
+        </ul>
+    </section>
 }
 else
 {
-    <section class="hero" style="padding-bottom:6px"><p class="eyebrow">ABAP NOTLARIM</p><h1>@(searching ? $"\"{query!.Trim()}\" için {resultCount} sonuç" : categoryName)@if (companyName is not null) { <span class="hero-sub"> › @companyName</span> }</h1><p>@(searching ? "En ilgili sonuçlar üstte. Kategori veya etiket seçerek daraltabilirsin." : "Soldan bir sayfa seç ve tam içeriğini oku.")</p></section>
+    <section class="screen-head">
+        <div class="screen-title"><span class="tcode">@(categoryCode ?? "ARAMA")</span><h1>@(searching ? $"“{query!.Trim()}” için {resultCount} sonuç" : categoryName)@if (companyName is not null) { <span class="hero-sub"> › @companyName</span> }</h1></div>
+        <p class="muted">@(searching ? "En ilgili sonuçlar üstte. Kategori veya etiket seçerek daraltabilirsin. Joker: * birden çok harf, + tek harf (rs*abap*, *çelik*)." : $"{Model.Count} sayfa. Soldan bir sayfa seç, tam içeriği sağda açılır.")</p>
+    </section>
     <form method="get" asp-action="Index" class="search">
-        <input type="search" name="q" value="@query" placeholder="Başlık, kod veya açıklama ara..." />
+        <label class="sr-only" for="scope-search">@(selectedCategory.HasValue && !searching ? "Bu kategoride ara" : "Notlarda ara")</label>
+        <input id="scope-search" type="search" name="q" value="@query" placeholder="@(selectedCategory.HasValue && !searching ? $"{categoryName} içinde ara" : "Başlık, kod veya açıklama ara")" />
         @if (selectedCategory.HasValue) { <input type="hidden" name="category" value="@selectedCategory" /> }
         @if (selectedCompany.HasValue) { <input type="hidden" name="company" value="@selectedCompany" /> }
         <button type="submit">Ara</button>
@@ -81,7 +114,7 @@ else
             }
         </div>
     }
-    <div class="row-between"><a class="back-link" asp-action="Index">← Tüm kategoriler</a><a class="action" asp-action="Index" asp-route-category="@selectedCategory" asp-route-company="@selectedCompany" asp-route-q="@query" asp-route-create="true">+ Yeni Not</a></div>
+    <a class="back-link" asp-action="Index"><span aria-hidden="true">←</span> Tüm kategoriler</a>
     @* Üç kolon: soldan sağa kategoriler, sayfalar, not. *@
     <div class="reading-layout">
         <aside class="note-sidebar category-sidebar" aria-label="Kategoriler">
@@ -89,8 +122,8 @@ else
            <nav class="note-list">
            @foreach (var c in categories)
            {
-               <a class="category-row @(c.Id == selectedCategory ? "active" : "")" asp-action="Index" asp-route-category="@c.Id">
-                   <span>@c.Name</span><span class="category-row-count">@c.NoteCount</span>
+               <a class="category-row @(c.Id == selectedCategory ? "active" : "")" asp-action="Index" asp-route-category="@c.Id" aria-current="@(c.Id == selectedCategory ? "page" : null)">
+                   <span class="tcode tcode-s">@TCodes.ForCategory(c.Name)</span><span class="category-row-name">@c.Name</span><span class="category-row-count">@c.NoteCount</span>
                </a>
                @* Projeler açıkken altında firmalar listelenir; her firmanın kendi sayfaları vardır. *@
                if (c.Id == projectsId && selectedCategory == projectsId)
@@ -128,11 +161,26 @@ else
                </details>
            }
            </div>
-           @if (canReorder && Model.Count > 1) { <div class="reorder-hint">Sıralamak için sayfaları sürükle</div> }
+           @if (canReorder && selectedCategory.HasValue)
+           {
+               <div class="reorder-hint">
+                   <span>@(grouped ? "Sürükle: sırala veya başka alt kategoriye taşı" : Model.Count > 1 ? "Sıralamak için sayfaları sürükle" : "")</span>
+                   <a class="subcat-link" href="/Subcategories/@selectedCategory">@(grouped ? "Alt kategoriler" : "Alt kategorilere böl")</a>
+               </div>
+           }
            <nav class="note-list" data-reorder="@(canReorder ? "true" : "false")">
            @if (canReorder) { @Html.AntiForgeryToken() }
-           @foreach (var n in Model)
+           @foreach (var item in listItems)
            {
+               if (item.IsHead)
+               {
+                   @* Grup başlığı; sürüklenen sayfa başlığın üstüne bırakılırsa o alt kategoriye geçer. *@
+                   <div class="note-group @(item.Count == 0 ? "is-empty" : "")" data-sub="@(item.Group?.Id.ToString() ?? "")" role="heading" aria-level="3">
+                       <span>@(item.Group?.Name ?? Subcategory.General)</span><b data-group-count>@item.Count</b>
+                   </div>
+                   continue;
+               }
+               var n = item.Note!;
                <a class="note-row @(selectedNote?.Id == n.Id ? "active" : "")" draggable="@(canReorder ? "true" : "false")" data-id="@n.Id" asp-action="Index" asp-route-category="@selectedCategory" asp-route-q="@query" asp-route-company="@selectedCompany" asp-route-tag="@selectedTag" asp-route-note="@n.Id">
                    @if (hits.TryGetValue(n.Id, out var hit))
                    {
@@ -183,16 +231,16 @@ else
           }
           else if (selectedNote is not null)
           {
-              <div class="doc-top"><span class="doc-kicker">@selectedNote.Category?.Name@if (selectedNote.Company is not null) { <text> › @selectedNote.Company.Name</text> }</span><span><a asp-action="Index" asp-route-category="@selectedCategory" asp-route-q="@query" asp-route-company="@selectedCompany" asp-route-note="@selectedNote.Id" asp-route-edit="true">Düzenle</a><partial name="_DeleteForm" model="selectedNote" /></span></div>
+              <div class="doc-top"><span class="doc-kicker">@selectedNote.Category?.Name@if (selectedNote.Subcategory is not null) { <text> › @selectedNote.Subcategory.Name</text> }@if (selectedNote.Company is not null) { <text> › @selectedNote.Company.Name</text> }</span><span><a asp-action="Index" asp-route-category="@selectedCategory" asp-route-q="@query" asp-route-company="@selectedCompany" asp-route-note="@selectedNote.Id" asp-route-edit="true">Düzenle</a><partial name="_DeleteForm" model="selectedNote" /></span></div>
               <h2 class="doc-title">@selectedNote.Title</h2>
               <div class="doc-date">Son düzenleme: @selectedNote.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
               <div class="doc-body" data-highlight="@(searching ? query!.Trim() : "")"><partial name="_NoteBody" model="selectedNote" /></div>
               @if (!string.IsNullOrWhiteSpace(selectedNote.Code))
               {
-                  <h3>ABAP Kod Örneği</h3><pre class="doc-code"><code>@selectedNote.Code</code></pre>
+                  <h3>ABAP Kod Örneği</h3><pre class="doc-code" tabindex="0"><code>@selectedNote.Code</code></pre>
               }
               @if (selectedNote.TagNames.Any()) { <div class="doc-source">Etiketler: @string.Join(", ", selectedNote.TagNames)</div> }
-              @if (selectedNote.Source is not null) { <div class="doc-source">Kaynak: @selectedNote.Source @if (selectedNote.SourcePage.HasValue) { <span> · Sayfa @selectedNote.SourcePage</span> }</div> }
+              @if (selectedNote.Source is not null) { <div class="doc-source"><partial name="_Source" model="selectedNote" /></div> }
           }
           else { <div class="reading-empty">@(searching ? "Sonuç bulunamadı. Daha kısa ya da farklı bir ifade dene." : companyName is not null ? "Bu firmada henüz sayfa yok. \"+ Yeni Not\" ile ekleyebilirsin." : "Bu kategori için henüz bir not bulunmuyor.")</div> }
         </article>

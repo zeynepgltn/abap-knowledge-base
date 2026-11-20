@@ -1,3 +1,76 @@
-@{ /* Okuma ekranı gibi sayfalar ViewData["Wide"] = true ile daha geniş alan kullanır. */ var wrap = ViewData["Wide"] is true ? "wrap wide" : "wrap"; }
-<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ABAP Bilgi Bankası</title><script>/* Kayıtlı temayı CSS yüklenmeden uygula, sayfa açılırken beyaz parlama olmasın. */try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}</script><link rel="stylesheet" href="~/css/site.css" asp-append-version="true" /></head>
-<body><header><div class="@wrap nav"><a class="brand" asp-controller="Notes" asp-action="Index">◈ ABAP Bilgi Bankası</a><nav><button type="button" class="theme-toggle" id="themeToggle" aria-label="Temayı değiştir" title="Temayı değiştir">☾</button><a asp-controller="Notes" asp-action="Index">Notlarım</a><a class="nav-quiz" asp-controller="Quiz" asp-action="Index">Günün Quiz'i</a>@* Bir kategori/firma listesindeyken yeni not sağ panelde, o kategori seçili açılır; başka yerde ayrı form sayfası. *@@if (ViewBag.SelectedCategory is int navCategory) { <a class="action" asp-controller="Notes" asp-action="Index" asp-route-category="@navCategory" asp-route-company="@(ViewBag.SelectedCompany as int?)" asp-route-create="true">+ Yeni Not</a> } else { <a class="action" asp-controller="Notes" asp-action="Create">+ Yeni Not</a> }</nav></div></header><main class="@wrap">@if (TempData["Flash"] is string flash) { <div class="flash" role="status">@flash</div> }@RenderBody()</main><footer class="@wrap">Yerel prototip · Kimlik doğrulama olmadan internete açmayın.</footer><script src="~/js/site.js" asp-append-version="true"></script>@await RenderSectionAsync("Scripts",required:false)</body></html>
+@using ABAPKnowledgeBase.Services
+@inject SessionInfo Session
+@{
+    // Her görünüm kendi başlığını, açıklamasını ve işlem kodunu ViewData ile verir (bkz. DESIGN.md).
+    var title = ViewData["Title"] as string;
+    var description = ViewData["Description"] as string ?? "Kişisel ABAP bilgi bankası: kategorilere ayrılmış notlar, kod örnekleri ve notlardan üretilen günlük quiz.";
+    var tcode = ViewData["TCode"] as string ?? TCodes.Home;
+    var categories = await Session.CategoriesAsync();
+    var path = Context.Request.Path.Value ?? "/";
+    var onQuiz = path.StartsWith("/Quiz", StringComparison.OrdinalIgnoreCase);
+    var onNotes = !onQuiz && (path == "/" || path.StartsWith("/Notes", StringComparison.OrdinalIgnoreCase));
+    var isHome = ViewData["Home"] is true;
+    // Durum çubuğu mesajı: yönlendirmeden gelen (TempData) ya da sayfanın kendi verdiği (ViewData, ör. hata sayfası).
+    var flash = TempData["Flash"] as string ?? ViewData["StatusMessage"] as string;
+    var flashType = TempData["FlashType"] as string ?? ViewData["StatusType"] as string ?? "S";
+}
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@(title is null ? "ABAP Bilgi Bankası" : $"{title} · ABAP Bilgi Bankası")</title>
+    <meta name="description" content="@description">
+    <meta property="og:title" content="@(title ?? "ABAP Bilgi Bankası")">
+    <meta property="og:description" content="@description">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="theme-color" content="#eef0f2" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#111418" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="~/fonts/host-grotesk-300_800-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <script>/* Kayıtlı temayı ve yapışkan sütun durumunu CSS yüklenmeden uygula: sayfa açılırken parlama olmasın. */try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}try{if(localStorage.getItem('stickyDock')==='closed')document.documentElement.dataset.dock='closed';}catch(e){}</script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
+</head>
+<body class="@(isHome ? "is-home" : "")">
+<a class="skip-link" href="#main">İçeriğe geç</a>
+<header class="session-bar">
+    <div class="@(ViewData["Wide"] is true ? "wrap wide" : "wrap") nav">
+        <a class="brand" href="/" aria-label="ABAP Bilgi Bankası, ana sayfa"><span class="brand-mark" aria-hidden="true">◈</span><span class="brand-name">ABAP Bilgi Bankası</span></a>
+        @* Komut alanı (SAP'deki OK-code alanı): işlem kodu ya da arama. "/" tuşu her ekrandan buraya getirir (site.js). *@
+        <form class="okcode" action="/" method="get" role="search" data-okcode-form>
+            <label class="sr-only" for="okcode">Komut veya arama</label>
+            <input id="okcode" name="q" list="tcodes" autocomplete="off" spellcheck="false" placeholder="Komut veya arama" data-okcode>
+            <span class="okcode-caret" aria-hidden="true"></span>
+            <kbd class="okcode-key" aria-hidden="true">/</kbd>
+        </form>
+        <datalist id="tcodes">
+            <option value="@TCodes.Home">Notlarım</option>
+            <option value="@TCodes.Quiz">Günün Quiz'i</option>
+            <option value="@TCodes.NewNote">Yeni not</option>
+            @foreach (var c in categories) { <option value="@c.Code">@c.Name</option> }
+        </datalist>
+        <nav class="menu" aria-label="Ana menü">
+            <a class="menu-link" href="/" aria-current="@(onNotes ? "page" : null)">Notlar</a>
+            <a class="menu-link" asp-controller="Quiz" asp-action="Index" aria-current="@(onQuiz ? "page" : null)">Quiz</a>
+            @* Bir kategori/firma listesindeyken yeni not sağ panelde, o kategori seçili açılır; başka yerde ayrı form sayfası. *@
+            @if (ViewBag.SelectedCategory is int navCategory) { <a class="action action-new" asp-controller="Notes" asp-action="Index" asp-route-category="@navCategory" asp-route-company="@(ViewBag.SelectedCompany as int?)" asp-route-create="true"><span>Yeni not</span></a> } else { <a class="action action-new" asp-controller="Notes" asp-action="Create"><span>Yeni not</span></a> }
+            <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Temayı değiştir" title="Temayı değiştir">☾</button>
+            <button type="button" class="icon-btn nav-sticky" data-dock-toggle aria-controls="stickyDock" title="Yapışkan notları aç/kapat"><span aria-hidden="true">📌</span><span class="nav-label">Yapışkan Notlar</span></button>
+        </nav>
+    </div>
+</header>
+<main id="main" class="@(ViewData["Wide"] is true ? "wrap wide" : "wrap")" tabindex="-1">@RenderBody()</main>
+@* Durum çubuğu: SAP'deki gibi son işlemin sonucu solda (S başarılı, W uyarı, E hata, I bilgi), oturum bilgisi sağda. *@
+<footer class="statusbar">
+    <p class="status-msg" role="status" data-type="@(flash is null ? "I" : flashType)" @(flash is null ? "" : "data-fresh")>
+        <span class="status-type" aria-hidden="true">@(flash is null ? "I" : flashType)</span>
+        <span data-status-text>@(flash ?? "Hazır.")</span>
+    </p>
+    <p class="status-sys"><span class="tcode">@tcode</span><span>@categories.Sum(c => c.NoteCount) not</span><span class="status-hide-s">@categories.Count kategori</span></p>
+</footer>
+@await Component.InvokeAsync("StickyDock")
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

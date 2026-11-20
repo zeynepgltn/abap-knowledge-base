@@ -1,0 +1,7 @@
+@model ABAPKnowledgeBase.Models.Note
+@* Notun kaynağı: web adresiyse yeni sekmede açılan link, değilse düz metin. *@
+@if (Model.Source is { } source) {
+ <span>Kaynak: </span>
+ @if (source.Url is { } url) { <a href="@url" target="_blank" rel="noopener noreferrer" title="@url">🔗 @source.LinkText</a> } else { <span>@source</span> }
+ @if (Model.SourcePage.HasValue) { <span> · Sayfa @Model.SourcePage</span> }
+}

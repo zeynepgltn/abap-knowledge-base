@@ -1,0 +1,18 @@
+@model List<ABAPKnowledgeBase.Models.StickyNote>
+@* Sağda sabit yapışkan notlar sütunu. Açık/kapalı durumu tarayıcıda hatırlanır (site.js, _Layout'taki ilk betik). *@
+<aside class="sticky-dock" id="stickyDock" aria-label="Yapışkan notlar" data-sticky-dock>
+ <div class="sticky-dock-head">
+  <b>Yapışkan notlar</b><span class="sticky-count" data-sticky-count title="Açık not sayısı">@Model.Count(n => !n.Done)</span>
+  <button type="button" class="sticky-dock-add" data-sticky-add title="Yeni yapışkan not" aria-label="Yeni yapışkan not">+</button>
+  <button type="button" class="sticky-dock-close" data-dock-toggle title="Sütunu kapat" aria-label="Yapışkan notları kapat">⇥</button>
+ </div>
+ @Html.AntiForgeryToken()
+ <div class="sticky-dock-body">
+  <p class="sticky-empty" data-sticky-empty @(Model.Count > 0 ? "hidden" : "")>Henüz not yok. <b>+</b> ile yapılacak bir iş ya da kısa bir hatırlatma ekle; yazdıkça kaydedilir, ekran görüntüsü de yapıştırabilirsin.</p>
+  <div class="sticky-board" data-sticky-board>
+   @foreach (var n in Model) { <partial name="_Sticky" model="n" /> }
+  </div>
+ </div>
+ <template data-sticky-template><partial name="_Sticky" model="new ABAPKnowledgeBase.Models.StickyNote()" /></template>
+</aside>
+<button type="button" class="sticky-dock-tab" data-dock-toggle title="Yapışkan notları aç" aria-label="Yapışkan notları aç" aria-controls="stickyDock">📌</button>

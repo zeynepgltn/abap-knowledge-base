@@ -1,0 +1,244 @@
+{
+  "url": "http://127.0.0.1:4400/__shoot-missing-page-1795011776586",
+  "errors": [],
+  "failed": [],
+  "desktop": {
+    "loadMs": 211,
+    "loaderMs": null,
+    "settledMs": 2568,
+    "vitals": {
+      "lcpMs": 176,
+      "lcpElement": "h1#dump-title.display",
+      "cls": 0.001
+    },
+    "height": 900,
+    "overflowX": false,
+    "offenders": [],
+    "h1": [
+      "Bu ekran yok."
+    ],
+    "smallTargets": [],
+    "glHidden": [],
+    "title": "Bulunamadı · ABAP Bilgi Bankası",
+    "glOn": false,
+    "scrollFps": {
+      "fps": 60,
+      "worstFrameMs": 18
+    },
+    "nav": {
+      "href": "/",
+      "scrollYAfter": 0,
+      "title": "Notlarım · ABAP Bilgi Bankası"
+    },
+    "idleMotion": false,
+    "idleAt": null
+  },
+  "mobile": {
+    "throttled": true,
+    "loadMs": 2293,
+    "loaderMs": null,
+    "settledMs": 4511,
+    "vitals": {
+      "lcpMs": 1320,
+      "lcpElement": "p",
+      "cls": 0
+    },
+    "height": 938,
+    "overflowX": false,
+    "offenders": [],
+    "h1": [
+      "Bu ekran yok."
+    ],
+    "smallTargets": [],
+    "glHidden": [],
+    "title": "Bulunamadı · ABAP Bilgi Bankası",
+    "glOn": false,
+    "scrollFps": {
+      "fps": 60,
+      "worstFrameMs": 17
+    }
+  },
+  "files": [
+    "C:\\not uygulamam\\.shots\\404\\d-00-firstpaint.png",
+    "C:\\not uygulamam\\.shots\\404\\d-01-hero.png",
+    "C:\\not uygulamam\\.shots\\404\\d-02-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\d-03-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\d-04-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\d-05-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\d-06-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\d-07-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\d-90-transition-a.png",
+    "C:\\not uygulamam\\.shots\\404\\d-90-transition-b.png",
+    "C:\\not uygulamam\\.shots\\404\\d-90-transition-c.png",
+    "C:\\not uygulamam\\.shots\\404\\d-91-after-nav.png",
+    "C:\\not uygulamam\\.shots\\404\\d-92-back.png",
+    "C:\\not uygulamam\\.shots\\404\\k-01-focus.png",
+    "C:\\not uygulamam\\.shots\\404\\k-02-focus.png",
+    "C:\\not uygulamam\\.shots\\404\\k-03-focus.png",
+    "C:\\not uygulamam\\.shots\\404\\k-04-focus.png",
+    "C:\\not uygulamam\\.shots\\404\\h-01-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-01-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\h-02-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-02-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\h-03-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-03-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\h-04-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-04-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\h-05-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-05-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\h-06-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-06-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\h-07-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-07-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\h-08-rest.png",
+    "C:\\not uygulamam\\.shots\\404\\h-08-hover.png",
+    "C:\\not uygulamam\\.shots\\404\\m-01-hero.png",
+    "C:\\not uygulamam\\.shots\\404\\m-02-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\m-03-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\m-04-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\m-05-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\m-06-scroll.png",
+    "C:\\not uygulamam\\.shots\\404\\r-01-hero.png",
+    "C:\\not uygulamam\\.shots\\404\\r-02-mid.png"
+  ],
+  "notes": [
+    "desktop FPS runs headless on a software GPU: treat it as a floor, not a measurement of real hardware",
+    "mobile runs at 4x CPU slowdown on slow 4G: mobile.vitals and mobile.scrollFps are the numbers that count",
+    "loadMs: ms from navigation to the load event, null if it had not fired after 30 s (desktop) or 60 s (phone); a heavy page takes long, while visitors see content at vitals.lcpMs. loaderMs: ms until the #loader ended, null when the page has none",
+    "settledMs: ms from navigation by which the first screen stopped changing, never before the fixed wait. null: still changing at the cap, either a long intro or continuous motion (a live shader, video); d-01-hero / m-01-hero tell which. reduced.moving: the screen was still changing 1.5 s after load with reduced motion on"
+  ],
+  "keyboard": {
+    "stops": [
+      "a \"İçeriğe geç\"",
+      "a \"◈ ABAP Bilgi Bankası\"",
+      "input \"INPUT\"",
+      "a \"Notlar\"",
+      "a \"Quiz\"",
+      "a \"Yeni not\"",
+      "button \"☾\"",
+      "button \"📌 Yapışkan Notlar\"",
+      "a \"Notlarıma dön\"",
+      "a \"Günün quiz'ini aç\"",
+      "button \"+\"",
+      "button \"⇥\""
+    ],
+    "skipLinkFirst": false,
+    "noVisibleFocus": [],
+    "invisibleFocus": [],
+    "stuck": false
+  },
+  "hover": {
+    "targets": [
+      {
+        "shot": "h-01",
+        "label": "button \"☾\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "backgroundColor",
+          "borderColor",
+          "transform"
+        ]
+      },
+      {
+        "shot": "h-02",
+        "label": "button \"Yapışkan Notlar\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "backgroundColor",
+          "borderColor",
+          "transform"
+        ]
+      },
+      {
+        "shot": "h-03",
+        "label": "button \"+\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "backgroundColor",
+          "borderColor",
+          "transform"
+        ]
+      },
+      {
+        "shot": "h-04",
+        "label": "button \"⇥\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "backgroundColor",
+          "borderColor",
+          "transform"
+        ]
+      },
+      {
+        "shot": "h-05",
+        "label": "button \"⠿\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "color",
+          "backgroundColor",
+          "borderColor",
+          "textDecorationColor",
+          "transform"
+        ]
+      },
+      {
+        "shot": "h-06",
+        "label": "button \"Rengi değiştir (şu an Mavi)\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "backgroundColor",
+          "transform"
+        ]
+      },
+      {
+        "shot": "h-07",
+        "label": "button \"🖼\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "color",
+          "backgroundColor",
+          "borderColor",
+          "textDecorationColor",
+          "transform"
+        ]
+      },
+      {
+        "shot": "h-08",
+        "label": "a \"Notlarıma dön\"",
+        "interactive": true,
+        "primary": true,
+        "react": "moves",
+        "changed": [
+          "transform"
+        ]
+      }
+    ],
+    "noHoverChange": [],
+    "colorOnly": [],
+    "covered": [],
+    "cursorFollower": false
+  },
+  "reduced": {
+    "hiddenText": 0,
+    "moving": false
+  },
+  "a11y": {
+    "violations": [],
+    "serious": 0,
+    "contrastNeedsReview": 7
+  }
+}

@@ -7,12 +7,12 @@ namespace ABAPKnowledgeBase.Services;
 /// Kural tabanlı soru üretici (quiz aşama 1). Makine öğrenmesi kullanmaz; notlardaki
 /// "kavram: açıklama" çiftlerinden ve kod satırlarından soru kurar.
 ///
-/// Günün quiz'i: 3 mantık + 2 kod, 1 kolay + 3 orta + 1 zor.
-///   1. Mantık · Kolay  "kavram-bul"   açıklaması verilen kavram hangisi?
-///   2. Mantık · Orta   "tanim-sec"    kavramın doğru açıklaması hangisi?  (ya da "bosluk-doldur", aşağıda)
-///   3. Mantık · Orta   "farkli-olan"  hangisi bu notun kavramlarından biri değil?
-///   4. Kod · Orta      "kod-ne-yapar" bu kod satırı ne yapar?  (yoksa "kod-tamamla": boşluğa ne gelir?)
-///   5. Kod · Zor       "hatali-satir" kod parçasındaki hatalı satır hangisi?
+/// Günün quiz'i: 8 soru, 5 mantık + 3 kod, 2 kolay + 5 orta + 1 zor.
+///   1-2. Mantık · Kolay  "kavram-bul"    açıklaması verilen kavram hangisi?  (2. yoksa "bosluk-doldur")
+///   3-4. Mantık · Orta   "bosluk-doldur" ve "tanim-sec" (kavramın doğru açıklaması hangisi?)
+///   5.   Mantık · Orta   "farkli-olan"   hangisi bu notun kavramlarından biri değil?
+///   6-7. Kod · Orta      "kod-ne-yapar"  bu kod satırı ne yapar?  ve "kod-tamamla": boşluğa ne gelir?
+///   8.   Kod · Zor       "hatali-satir"  kod parçasındaki hatalı satır hangisi?
 ///
 /// Aşama 2: "bosluk-doldur" notun bir cümlesinde TF-IDF ile bulunmuş anahtar terimi gizler
 /// (terimleri ml/anahtar_terimler.py hesaplar). Böylece "kavram: açıklama" düzeninde yazılmamış notlar da sorulabilir.
@@ -28,26 +28,30 @@ public sealed partial class RuleQuizGenerator(Random rng) {
 
  private IReadOnlyList<NoteMaterial> pool = [];
 
- public List<QuizQuestion> Generate(IReadOnlyList<NoteMaterial> materials, IReadOnlyDictionary<int, NoteReview> reviews, DateOnly today) {
+ // avoidNotes: aynı gün önceki turlarda sorulmuş notlar; yeterli not varsa tekrar sorulmaz.
+ public List<QuizQuestion> Generate(IReadOnlyList<NoteMaterial> materials, IReadOnlyDictionary<int, NoteReview> reviews, DateOnly today,
+  IReadOnlySet<int>? avoidNotes = null) {
   pool = materials;
   var ranked = materials
-   .Select(m => (m, priority: Priority(reviews.GetValueOrDefault(m.Note.Id), today), tie: rng.Next()))
+   .Select(m => (m, priority: Priority(reviews.GetValueOrDefault(m.Note.Id), today) + (avoidNotes?.Contains(m.Note.Id) == true ? 1000 : 0), tie: rng.Next()))
    .OrderBy(x => x.priority).ThenBy(x => x.tie).Select(x => x.m).ToList();
 
-  // 2. soru günden güne boşluk doldurma ya da tanım seçme olur; biri çıkmazsa diğeri denenir.
-  Func<NoteMaterial, QuizQuestion?>[] second = rng.Next(2) == 0 ? [FillBlank, ChooseDefinition] : [ChooseDefinition, FillBlank];
+  // 8 soru: 5 mantık + 3 kod; 2 kolay + 5 orta + 1 zor. Bir tip çıkmazsa listedeki sonraki denenir.
   var slots = new Slot[] {
    new(QuizKind.Logic, QuizDifficulty.Easy, [FindConcept]),
-   new(QuizKind.Logic, QuizDifficulty.Medium, second),
+   new(QuizKind.Logic, QuizDifficulty.Easy, [FindConcept, FillBlank]),
+   new(QuizKind.Logic, QuizDifficulty.Medium, [FillBlank, ChooseDefinition]),
+   new(QuizKind.Logic, QuizDifficulty.Medium, [ChooseDefinition, FillBlank]),
    new(QuizKind.Logic, QuizDifficulty.Medium, [OddOneOut, ChooseDefinition, FillBlank]),
    new(QuizKind.Code, QuizDifficulty.Medium, [WhatDoesCodeDo, CompleteCode]),
+   new(QuizKind.Code, QuizDifficulty.Medium, [CompleteCode, WhatDoesCodeDo]),
    new(QuizKind.Code, QuizDifficulty.Hard, [FindWrongLine]),
   };
   var result = new QuizQuestion?[slots.Length];
   var usedNotes = new HashSet<int>();
   var usedCategories = new HashSet<string>();
   // Kod malzemesi daha az notta var: önce kod soruları doldurulur, sonra mantık soruları.
-  foreach (var i in new[] { 4, 3, 0, 1, 2 }) {
+  foreach (var i in new[] { 7, 5, 6, 0, 1, 2, 3, 4 }) {
    var slot = slots[i];
    // Önce yeni bir kategoriden not aranır, bulunamazsa kategori tekrarına izin verilir.
    foreach (var newCategoryOnly in new[] { true, false }) {

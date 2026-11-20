@@ -8,7 +8,7 @@ public sealed record QuizStats(int Streak, int Answered, int Correct, int[] Boxe
 }
 
 /// <summary>
-/// Günün quiz'i: ilk açılışta 5 soru üretilip veritabanına yazılır, gün boyunca aynı quiz gösterilir.
+/// Günün quiz'i: ilk açılışta 8 soru üretilip veritabanına yazılır, gün boyunca aynı quiz gösterilir ("Yeni quiz" ile yeni tur açılır).
 /// Cevaplar notların Leitner kutularını günceller (aralıklı tekrar).
 /// </summary>
 public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTermsRunner keyTerms) {
@@ -18,9 +18,10 @@ public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTer
 
  public static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
 
+ // O günün son turu.
  public Task<QuizDay?> FindAsync(DateOnly date) => db.QuizDays
   .Include(d => d.Questions.OrderBy(q => q.Order)).ThenInclude(q => q.Note)
-  .FirstOrDefaultAsync(d => d.Date == date);
+  .Where(d => d.Date == date).OrderByDescending(d => d.Round).FirstOrDefaultAsync();
 
  public async Task<QuizDay> GetOrCreateAsync(DateOnly date) {
   var day = await FindAsync(date);
@@ -37,27 +38,37 @@ public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTer
   return (await FindAsync(date))!;
  }
 
- // Hiç cevap verilmediyse günün sorularını yeniden üretir.
- public async Task<bool> RegenerateAsync(DateOnly date) {
+ // İstenildiği an yeni quiz. Hiç cevap verilmediyse sorular yerinde yenilenir; cevap verildiyse yeni bir tur açılır:
+ // cevaplanan sorular (ve 👍/👎 puanları) önceki turda kalır, cevaplanmamışlar silinir.
+ // Aynı gün önceki turlarda sorulan notlar, yeterli not varsa yeniden sorulmaz.
+ public async Task<QuizDay> RegenerateAsync(DateOnly date) {
   var day = await FindAsync(date);
-  if (day is null || day.Questions.Any(q => q.Answered)) return false;
-  db.QuizQuestions.RemoveRange(day.Questions);
+  if (day is null) return await GetOrCreateAsync(date);
+  var avoid = (await db.QuizQuestions.Where(q => q.QuizDay!.Date == date && q.NoteId != null).Select(q => q.NoteId!.Value).ToListAsync()).ToHashSet();
+  var questions = await GenerateAsync(date, new Random(), avoid);
+  if (!day.Questions.Any(q => q.Answered)) {
+   db.QuizQuestions.RemoveRange(day.Questions);
+   await db.SaveChangesAsync();
+   day.Questions = questions;
+   day.CreatedAt = DateTime.UtcNow;
+  } else {
+   db.QuizQuestions.RemoveRange(day.Questions.Where(q => !q.Answered));
+   day = new QuizDay { Date = date, Round = day.Round + 1, Generator = RuleQuizGenerator.Name, Questions = questions };
+   db.QuizDays.Add(day);
+  }
   await db.SaveChangesAsync();
-  day.Questions = await GenerateAsync(date, new Random());
-  day.CreatedAt = DateTime.UtcNow;
-  await db.SaveChangesAsync();
-  return true;
+  return day;
  }
 
  // Kaydetmeden soru üretir (--quiz-onizleme için).
  public Task<List<QuizQuestion>> PreviewAsync(DateOnly date, int seed) => GenerateAsync(date, new Random(seed));
 
- private async Task<List<QuizQuestion>> GenerateAsync(DateOnly date, Random rng) {
+ private async Task<List<QuizQuestion>> GenerateAsync(DateOnly date, Random rng, IReadOnlySet<int>? avoidNotes = null) {
   // Not eklendi/değiştiyse anahtar terimler (TF-IDF) önce Python ile yeniden hesaplanır.
   await keyTerms.RefreshIfStaleAsync(db);
   var pool = await LoadPoolAsync();
   var reviews = await db.NoteReviews.AsNoTracking().ToDictionaryAsync(r => r.NoteId);
-  return new RuleQuizGenerator(rng).Generate(pool, reviews, date);
+  return new RuleQuizGenerator(rng).Generate(pool, reviews, date, avoidNotes);
  }
 
  public async Task<List<NoteMaterial>> LoadPoolAsync() {

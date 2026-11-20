@@ -28,8 +28,11 @@
 <label asp-for="Code">ABAP kodu (isteğe bağlı)</label><textarea asp-for="Code" rows="7" class="code-input" placeholder="DATA(...)"></textarea>
 <div class="row-between"><button type="button" class="secondary" id="suggestBtn">✦ Kategori öner</button><span class="muted">Öneriyi kontrol ederek sen onaylarsın.</span></div><div id="suggestions" class="suggestions"></div>
 <label asp-for="CategoryId">Ana kategori</label><select asp-for="CategoryId" asp-items="ViewBag.CategoryItems" id="CategoryId" data-projects-id="@ViewBag.ProjectsCategoryId"><option value="0">Kategori seç</option></select>
+@* Alt kategori: seçenekler seçili kategoriye göre süzülür (site.js); kategorinin alt kategorisi yoksa alan gizlenir. *@
+@{ var subItems = ViewBag.SubcategoryItems as List<ABAPKnowledgeBase.Models.Subcategory> ?? new(); }
+<div id="subcategoryField" class="subcategory-field" data-subcategory-field><label asp-for="SubcategoryId">Alt kategori</label><select asp-for="SubcategoryId" id="SubcategoryId"><option value="">Genel</option>@foreach (var s in subItems) { <option value="@s.Id" data-category="@s.CategoryId" selected="@(s.Id == Model.SubcategoryId)">@s.Name</option> }</select></div>
 @* Firma sadece Projeler kategorisi seçiliyken görünür (site.js). *@
 <div id="companyField" class="company-field"><label asp-for="CompanyId">Firma</label><select asp-for="CompanyId" asp-items="ViewBag.CompanyItems"><option value="">Firma yok</option></select></div>
 <label asp-for="TagsText">Etiketler (isteğe bağlı, virgülle)</label><input asp-for="TagsText" placeholder="Örn: REUSE_ALV_GRID_DISPLAY, SE38, saka" />
-<div class="two"><div><label asp-for="SourceText">Kaynak (isteğe bağlı)</label><input asp-for="SourceText" placeholder="abap temel seviye.pdf" /></div><div><label asp-for="SourcePage">Sayfa</label><input asp-for="SourcePage" type="number" min="1" /></div></div>
-<div class="actions"><button type="submit">Notu kaydet</button><a href="@(ViewBag.CancelUrl as string ?? Url.Action("Index"))">Vazgeç</a></div>
+<div class="two"><div><label asp-for="SourceText">Kaynak (isteğe bağlı)</label><input asp-for="SourceText" placeholder="abap temel seviye.pdf veya https://... web adresi" /></div><div><label asp-for="SourcePage">Sayfa</label><input asp-for="SourcePage" type="number" min="1" /></div></div>
+<div class="actions"><button type="submit" class="action"><span>Notu kaydet</span></button><a href="@(ViewBag.CancelUrl as string ?? Url.Action("Index"))">Vazgeç</a></div>

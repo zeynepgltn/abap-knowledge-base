@@ -1,0 +1,22 @@
+@model ABAPKnowledgeBase.Models.StickyNote
+@using ABAPKnowledgeBase.Models
+@using ABAPKnowledgeBase.Controllers
+@* Tek yapışkan not. Id = 0 olanı yeni not şablonudur (site.js kopyalar).
+   Başta tutamaç, tarih/durum ve araçlar; renk seçici renk noktasına basınca açılır. *@
+<article class="sticky c-@Model.Color @(Model.Done ? "done" : "")" data-id="@Model.Id">
+ <div class="sticky-head">
+  <button type="button" class="sticky-handle" title="Sürükleyip taşı" aria-label="Notu taşı">⠿</button>
+  <span class="sticky-meta" data-status>@(Model.Id > 0 ? StickyController.DateLabel(Model.CreatedAt) : "")</span>
+  <button type="button" class="sticky-color-btn" data-color-toggle aria-expanded="false" title="Renk: @StickyColors.Label(Model.Color)" aria-label="Rengi değiştir (şu an @StickyColors.Label(Model.Color))"></button>
+  <button type="button" data-image-pick title="Resim ekle (yapıştır veya sürükle de olur)" aria-label="Resim ekle"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5"/><circle cx="5.5" cy="6.25" r="1.25"/><path d="M2 12l3.75-3.5 2.5 2.25L11 8l3 3"/></svg></button>
+  <button type="button" data-done title="@(Model.Done ? "Geri al" : "Tamamlandı")" aria-label="Tamamlandı" aria-pressed="@(Model.Done ? "true" : "false")">✓</button>
+  <button type="button" data-delete title="Sil" aria-label="Notu sil">×</button>
+ </div>
+ <div class="sticky-colors" data-colors role="group" aria-label="Not rengi" hidden>
+  @foreach (var c in StickyColors.All) {
+   <button type="button" class="sticky-dot c-@c @(c == Model.Color ? "on" : "")" data-color="@c" title="@StickyColors.Label(c)" aria-label="Renk: @StickyColors.Label(c)" aria-pressed="@(c == Model.Color ? "true" : "false")"></button>
+  }
+ </div>
+ <textarea aria-label="Not" placeholder="@(Model.ImageIds.Count > 0 ? "Açıklama ekle…" : "Bir şey yaz… (resim yapıştırabilir ya da sürükleyebilirsin)")" maxlength="4000">@Model.Text</textarea>
+ <div class="sticky-images" data-images>@foreach (var imageId in Model.ImageIds) {<figure class="sticky-image" data-image-id="@imageId"><a href="/Sticky/Image/@imageId" target="_blank" rel="noopener" title="Büyük aç"><img src="/Sticky/Image/@imageId" alt="Yapışkan not resmi" loading="lazy" width="256" height="160"></a><button type="button" data-image-remove title="Resmi kaldır" aria-label="Resmi kaldır">×</button></figure>}</div>
+</article>

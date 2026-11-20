@@ -82,6 +82,9 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.Property<int?>("SourcePage")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("SubcategoryId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(180)
@@ -95,6 +98,8 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("SourceId");
+
+                    b.HasIndex("SubcategoryId");
 
                     b.HasIndex("Title");
 
@@ -221,9 +226,12 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Round")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Date")
+                    b.HasIndex("Date", "Round")
                         .IsUnique();
 
                     b.ToTable("QuizDays");
@@ -308,7 +316,7 @@ namespace ABAPKnowledgeBase.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
+                        .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Section")
@@ -321,6 +329,94 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Sources");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.StickyImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<int>("StickyNoteId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StickyNoteId");
+
+                    b.ToTable("StickyImages");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.StickyNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Done")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Done", "SortOrder");
+
+                    b.ToTable("StickyNotes");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Subcategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Subcategories");
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Tag", b =>
@@ -360,11 +456,18 @@ namespace ABAPKnowledgeBase.Data.Migrations
                         .HasForeignKey("SourceId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("ABAPKnowledgeBase.Models.Subcategory", "Subcategory")
+                        .WithMany("Notes")
+                        .HasForeignKey("SubcategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Category");
 
                     b.Navigation("Company");
 
                     b.Navigation("Source");
+
+                    b.Navigation("Subcategory");
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteImage", b =>
@@ -437,9 +540,33 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.Navigation("QuizDay");
                 });
 
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.StickyImage", b =>
+                {
+                    b.HasOne("ABAPKnowledgeBase.Models.StickyNote", "StickyNote")
+                        .WithMany("Images")
+                        .HasForeignKey("StickyNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StickyNote");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Subcategory", b =>
+                {
+                    b.HasOne("ABAPKnowledgeBase.Models.Category", "Category")
+                        .WithMany("Subcategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+                });
+
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Category", b =>
                 {
                     b.Navigation("Notes");
+
+                    b.Navigation("Subcategories");
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Company", b =>
@@ -460,6 +587,16 @@ namespace ABAPKnowledgeBase.Data.Migrations
                 });
 
             modelBuilder.Entity("ABAPKnowledgeBase.Models.Source", b =>
+                {
+                    b.Navigation("Notes");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.StickyNote", b =>
+                {
+                    b.Navigation("Images");
+                });
+
+            modelBuilder.Entity("ABAPKnowledgeBase.Models.Subcategory", b =>
                 {
                     b.Navigation("Notes");
                 });

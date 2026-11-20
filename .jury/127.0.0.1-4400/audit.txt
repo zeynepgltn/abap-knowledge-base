@@ -1,0 +1,27 @@
+FAIL  /                             missing meta description
+FAIL  /Quiz                         missing meta description
+FAIL  /Notes/Create                 missing meta description
+WARN  /                             no canonical link
+WARN  /                             missing og:title
+WARN  /                             missing og:description
+WARN  /                             missing og:image
+WARN  /                             missing twitter:card
+WARN  /                             no favicon link
+WARN  /Quiz                         no canonical link
+WARN  /Quiz                         missing og:title
+WARN  /Quiz                         missing og:description
+WARN  /Quiz                         missing og:image
+WARN  /Quiz                         missing twitter:card
+WARN  /Quiz                         no favicon link
+WARN  /Notes/Create                 no canonical link
+WARN  /Notes/Create                 missing og:title
+WARN  /Notes/Create                 missing og:description
+WARN  /Notes/Create                 missing og:image
+WARN  /Notes/Create                 missing twitter:card
+WARN  /Notes/Create                 no favicon link
+WARN  site                          no robots.txt
+WARN  site                          no sitemap
+
+3 pages crawled from http://127.0.0.1:4400
+heaviest page /Quiz: ~17 KB | html 4 | JS 5 (gz) | CSS 7 (gz) | fonts 0 | images 0
+3 FAIL, 20 WARN

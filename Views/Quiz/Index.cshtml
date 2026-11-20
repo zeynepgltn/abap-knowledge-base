@@ -5,20 +5,23 @@
  var day = Model.Day; var s = Model.Stats;
  var answered = day.Questions.Count(q => q.Answered);
  var correct = day.Questions.Count(q => q.Answered && q.IsCorrect);
+ var logic = day.Questions.Count(q => q.Kind == QuizKind.Logic); var code = day.Questions.Count - logic;
  string Level(string d) => d == QuizDifficulty.Easy ? "easy" : d == QuizDifficulty.Hard ? "hard" : "medium";
+ ViewData["Title"] = "Günün Quiz'i";
+ ViewData["TCode"] = TCodes.Quiz;
+ ViewData["Description"] = $"Notlardan üretilen günlük ABAP quiz'i: {day.Questions.Count} soru, Leitner kutularıyla aralıklı tekrar.";
 }
 <div class="row-between quiz-head">
  <div>
-  <h1>Günün Quiz'i</h1>
-  <p class="muted">@day.Date.ToString("d MMMM yyyy, dddd", new System.Globalization.CultureInfo("tr-TR")) · 3 mantık + 2 kod sorusu, notlarından üretildi.</p>
+  <div class="screen-title"><span class="tcode">@TCodes.Quiz</span><h1>Günün Quiz'i</h1></div>
+  <p class="muted">@day.Date.ToString("d MMMM yyyy, dddd", new System.Globalization.CultureInfo("tr-TR"))@(day.Round > 1 ? $" · {day.Round}. tur" : "") · @logic mantık + @code kod sorusu, notlarından üretildi.</p>
  </div>
- @if (answered == 0 && day.Questions.Count > 0) {
-  <form asp-action="Regenerate" method="post">@Html.AntiForgeryToken()<button type="submit" class="secondary" title="Henüz cevap vermediysen başka sorular üretir">↻ Başka sorular</button></form>
- }
+ @* Cevaplanmamış soru varken yeni quiz onay ister: cevaplananlar kaydedilir, cevaplanmamışlar silinir. *@
+ <form asp-action="Regenerate" method="post" data-confirm="@(answered > 0 && day.CompletedAt is null ? "Cevapladığın sorular kaydedildi; kalan sorular silinip yeni bir quiz oluşturulacak. Devam edilsin mi?" : null)">@Html.AntiForgeryToken()<button type="submit" class="secondary" title="İstediğin an yeni sorularla yeni bir quiz oluşturur; verdiğin cevaplar ve puanlar korunur"><span aria-hidden="true">↻</span> Yeni quiz</button></form>
 </div>
 
 <div class="quiz-stats">
- <div><b>@answered/@day.Questions.Count</b><span>bugün</span></div>
+ <div><b>@answered/@day.Questions.Count</b><span>bu quiz</span></div>
  <div><b>🔥 @s.Streak</b><span>gün seri</span></div>
  <div><b>%@s.Accuracy</b><span>toplam doğru (@s.Correct/@s.Answered)</span></div>
  <div><b>@s.Unseen</b><span>hiç sorulmamış not</span></div>
@@ -32,7 +35,7 @@
  <p class="reading-empty">Soru üretilecek kadar not bulunamadı. Notlarına “KAVRAM: açıklama” satırları veya kod blokları ekledikçe sorular oluşur.</p>
 }
 @if (day.CompletedAt is not null) {
- <div class="quiz-done" role="status"><b>Bugünkü quiz bitti: @correct/@day.Questions.Count doğru.</b> Yanlış yaptığın notlar yarın tekrar gelecek, doğrular daha seyrek sorulacak.</div>
+ <div class="quiz-done" role="status"><b>Quiz bitti: @correct/@day.Questions.Count doğru.</b> Yanlış yaptığın notlar yarın tekrar gelecek, doğrular daha seyrek sorulacak. Devam etmek istersen <b>↻ Yeni quiz</b>.</div>
 }
 
 @foreach (var q in day.Questions) {

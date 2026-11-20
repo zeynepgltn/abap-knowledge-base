@@ -31,7 +31,8 @@ public sealed class NoteLinks {
   (text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
    .Select(t => t.Length > 100 ? t[..100] : t).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
- // "OneNote: defter › bölüm" OneNote kaynağıdır; geri kalan her metin dosya adı sayılır.
+ // "OneNote: defter › bölüm" OneNote kaynağıdır; http(s):// veya www. ile başlayan adres web sitesidir;
+ // geri kalan her metin dosya adı sayılır.
  public static Source? ParseSource(string? text) {
   text = text?.Trim();
   if (string.IsNullOrEmpty(text)) return null;
@@ -39,6 +40,7 @@ public sealed class NoteLinks {
   var sep = text.IndexOf(" › ", StringComparison.Ordinal);
   if (text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && sep > prefix.Length)
    return new Source { Kind = Source.OneNote, Name = Cut(text[prefix.Length..sep], 200), Section = Cut(text[(sep + 3)..], 300) };
+  if (Source.WebUrl(text) is not null) return new Source { Kind = Source.Web, Name = Cut(text, 1000) };
   return new Source { Kind = Source.File, Name = Cut(text, 200) };
  }
  private static string Cut(string s, int max) => (s.Length > max ? s[..max] : s).Trim();

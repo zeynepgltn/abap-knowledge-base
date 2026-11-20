@@ -3,12 +3,14 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 namespace ABAPKnowledgeBase.Models;
 
-// Günlük quiz: her gün 5 soru (3 mantık + 2 kod; 1 kolay + 3 orta + 1 zor).
+// Günlük quiz: her gün 8 soru (5 mantık + 3 kod; 2 kolay + 5 orta + 1 zor). İstenirse aynı gün yeni turlar oluşturulur.
 // Sorular veritabanında tutulur: gün içinde aynı quiz açılır, yedekle diğer bilgisayara da geçer.
 // Soruları kim üretirse üretsin (şimdi kural tabanlı C#, ileride Python/ML) bu tablolara yazar.
 public class QuizDay {
  public int Id {get;set;}
  public DateOnly Date {get;set;}
+ // Aynı gün "Yeni quiz" ile oluşturulan her quiz yeni bir tur: 1, 2, 3... Önceki turların cevapları ve puanları korunur.
+ public int Round {get;set;}=1;
  // Soruları üreten yöntem ve sürümü, ör. "kural-v1". Hangi yöntemin daha iyi soru ürettiğini ölçmek için.
  [StringLength(40)] public string Generator {get;set;}="";
  public DateTime CreatedAt {get;set;}=DateTime.UtcNow;

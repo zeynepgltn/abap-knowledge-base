@@ -1,7 +1,31 @@
-@{ int status = ViewBag.Status ?? 500; }
-<section class="hero">
-  <p class="eyebrow">HATA @status</p>
-  <h1>@(status == 404 ? "Bulunamadı" : "Bir şeyler ters gitti")</h1>
-  <p>@ViewBag.Message</p>
-</section>
-<p><a class="action" asp-controller="Notes" asp-action="Index">← Notlarıma dön</a></p>
+@using ABAPKnowledgeBase.Services
+@{
+    // Hata sayfası SAP'deki kısa döküm (ST22) gibi: hatanın adı, ne olduğu, ne yapılabileceği ve analiz.
+    int status = ViewBag.Status ?? 500;
+    var name = status switch { 404 => "SAYFA_BULUNAMADI", 400 => "ISTEK_GECERSIZ", _ => "BEKLENMEYEN_HATA" };
+    var path = Context.Features.Get<Microsoft.AspNetCore.Diagnostics.IStatusCodeReExecuteFeature>()?.OriginalPath
+        ?? Context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>()?.Path ?? Context.Request.Path.Value;
+    ViewData["Title"] = status == 404 ? "Bulunamadı" : "Hata";
+    ViewData["TCode"] = TCodes.Dump;
+    ViewData["StatusMessage"] = $"Çalışma zamanı hatası {name}";
+    ViewData["StatusType"] = "E";
+    ViewData["Description"] = ViewBag.Message as string;
+}
+<article class="dump" aria-labelledby="dump-title">
+    <p class="dump-kind">Kısa döküm <span class="tcode">@TCodes.Dump</span></p>
+    <h1 id="dump-title" class="display">@(status == 404 ? "Bu ekran yok." : "Program durdu.")</h1>
+    <dl class="dump-grid">
+        <dt>Çalışma zamanı hatası</dt><dd><code>@name</code></dd>
+        <dt>HTTP durumu</dt><dd><code>@status</code></dd>
+        <dt>İstenen adres</dt><dd><code>@path</code></dd>
+        <dt>Zaman</dt><dd><code>@DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss")</code></dd>
+    </dl>
+    <section class="dump-section"><h2>Ne oldu?</h2><p>@ViewBag.Message</p></section>
+    <section class="dump-section"><h2>Ne yapabilirsin?</h2>
+        <ul class="dump-actions">
+            <li><a class="action" href="/"><span>Notlarıma dön</span></a></li>
+            <li><a class="back-link" href="/Quiz">Günün quiz'ini aç</a></li>
+            <li>ya da yukarıdaki komut alanına bir işlem kodu yaz: <kbd>ZALV</kbd>, <kbd>ZSQL</kbd> …</li>
+        </ul>
+    </section>
+</article>

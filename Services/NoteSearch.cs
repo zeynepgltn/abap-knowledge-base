@@ -14,19 +14,22 @@ namespace ABAPKnowledgeBase.Services;
 public static partial class NoteSearch {
  public sealed record Hit(Note Note, int Score, string Where, string Before, string Match, string After);
 
- // Veritabanı filtresiyle (TextMatch) aynı kural: büyük/küçük harf ve İ/I/ı/i farkı gözetilmez.
- // Fold harf harf çevirir, metnin uzunluğu değişmez; bulunan konum orijinal metinde de geçerlidir.
- private static int Find(string? text, string term, int start = 0) =>
-  string.IsNullOrEmpty(text) || start >= text.Length ? -1 : TextMatch.Fold(text).IndexOf(TextMatch.Fold(term), start, StringComparison.Ordinal);
+ // Veritabanı filtresiyle (TextMatch) aynı kural: büyük/küçük harf ve İ/I/ı/i farkı gözetilmez, * ve + jokerdir.
+ // Konum ve uzunluk döner: jokerli aramada eşleşen sözcük aranan kelimeden uzun olabilir.
+ private static (int Index, int Length) Locate(string? text, string term, int start = 0) => TextMatch.Find(text, term, start);
+ private static int Find(string? text, string term) => Locate(text, term).Index;
  private static int Count(string? text, string term) {
   var count = 0;
-  for (var i = Find(text, term); i >= 0 && count < 10; i = Find(text, term, i + term.Length)) count++;
+  for (var (i, len) = Locate(text, term); i >= 0 && count < 10; (i, len) = Locate(text, term, i + Math.Max(len, 1))) count++;
   return count;
  }
 
  // "VALUE #(" gibi sembollü aramalar bölünmesin diye sadece boşluktan ayrılır.
+ // Sadece jokerden oluşan kelime ("*", "+") her şeye uyacağı için atılır.
  public static string[] Words(string query) =>
-  query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+  query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+   .Where(w => w.Any(c => c is not '*' and not '+'))
+   .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
  public static List<Hit> Rank(IEnumerable<Note> notes, string query, IReadOnlyDictionary<int, string> ocrByNote) {
   var phrase = query.Trim();
@@ -36,7 +39,7 @@ public static partial class NoteSearch {
    var ocr = ocrByNote.GetValueOrDefault(note.Id);
    var tags = string.Join(", ", note.TagNames);
    var score = 0;
-   if (TextMatch.Fold(note.Title.Trim()) == TextMatch.Fold(phrase)) score += 100;
+   if (!TextMatch.HasWildcard(phrase) && TextMatch.Fold(note.Title.Trim()) == TextMatch.Fold(phrase)) score += 100;
    else if (Find(note.Title, phrase) is var t && t >= 0) score += t == 0 ? 70 : 60;
    if (Find(tags, phrase) >= 0) score += 25;
    if (Find(note.Code, phrase) >= 0) score += 20;
@@ -64,10 +67,10 @@ public static partial class NoteSearch {
   var terms = words.Length > 1 ? words.Prepend(phrase).ToArray() : new[] { phrase };
   foreach (var term in terms)
    foreach (var (where, text) in sources)
-    if (Find(text, term) is var i && i >= 0) {
+    if (Locate(text, term) is var (i, len) && i >= 0) {
      var start = Math.Max(0, i - 60);
-     var end = Math.Min(text!.Length, i + term.Length + 90);
-     return (where, (start > 0 ? "…" : "") + text[start..i], text.Substring(i, term.Length), text[(i + term.Length)..end] + (end < text.Length ? "…" : ""));
+     var end = Math.Min(text!.Length, i + len + 90);
+     return (where, (start > 0 ? "…" : "") + text[start..i], text.Substring(i, len), text[(i + len)..end] + (end < text.Length ? "…" : ""));
     }
   // Sadece başlıkta geçiyorsa notun başı gösterilir.
   var body = Clean(note.Body) ?? "";
@@ -84,8 +87,8 @@ public static partial class NoteSearch {
  // Başlıkta vurgulamak için: (öncesi, eşleşen, sonrası). İfade yoksa ilk geçen kelime; hiçbiri yoksa eşleşen boştur.
  public static (string Before, string Match, string After) Split(string text, string query) {
   foreach (var term in Words(query).Prepend(query.Trim()))
-   if (term.Length > 0 && Find(text, term) is var i && i >= 0)
-    return (text[..i], text.Substring(i, term.Length), text[(i + term.Length)..]);
+   if (term.Length > 0 && Locate(text, term) is var (i, len) && i >= 0)
+    return (text[..i], text.Substring(i, len), text[(i + len)..]);
   return (text, "", "");
  }
 
