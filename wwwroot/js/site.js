@@ -433,15 +433,4 @@ document.addEventListener('DOMContentLoaded',()=>{
  // data-confirm taşıyan formlar göndermeden önce onay ister (ör. yarım quiz'i yenileme).
  for(const form of document.querySelectorAll('form[data-confirm]'))
   form.addEventListener('submit',e=>{if(form.dataset.confirm&&!confirm(form.dataset.confirm))e.preventDefault();});
- const btn=document.querySelector('#suggestBtn'); if(!btn)return;
- btn.addEventListener('click',async()=>{
-  const token=document.querySelector('input[name="__RequestVerificationToken"]')?.value;
-  const suggestions=document.querySelector('#suggestions');suggestions.textContent='Öneriler hazırlanıyor...';
-  try {
-   const response=await fetch('/Notes/Suggest',{method:'POST',headers:{'Content-Type':'application/json','RequestVerificationToken':token},body:JSON.stringify({title:document.querySelector('#Title').value,body:document.querySelector('#Body').value,code:document.querySelector('#Code').value})});
-   if(!response.ok)throw new Error('İstek başarısız'); const list=await response.json();suggestions.replaceChildren();
-   if(list.length===0){suggestions.textContent='Güvenilir öneri bulunamadı. Kategoriyi elle seç.';return;}
-   for(const item of list){const b=document.createElement('button');b.type='button';b.className='suggest';b.textContent=item.category+' · '+item.evidence;b.addEventListener('click',()=>{const select=document.querySelector('#CategoryId');const opt=[...select.options].find(x=>x.text===item.category);if(opt){select.value=opt.value;select.dispatchEvent(new Event('change'));}});suggestions.appendChild(b);}
-  }catch(e){suggestions.textContent='Öneri alınamadı: '+e.message;}
- });
 });

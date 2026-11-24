@@ -140,30 +140,6 @@ namespace ABAPKnowledgeBase.Data.Migrations
                     b.ToTable("NoteImages");
                 });
 
-            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteKeyTerm", b =>
-                {
-                    b.Property<int>("NoteId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Rank")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("ComputedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<double>("Score")
-                        .HasColumnType("REAL");
-
-                    b.Property<string>("Term")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("NoteId", "Rank");
-
-                    b.ToTable("NoteKeyTerms");
-                });
-
             modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteReview", b =>
                 {
                     b.Property<int>("NoteId")
@@ -474,17 +450,6 @@ namespace ABAPKnowledgeBase.Data.Migrations
                 {
                     b.HasOne("ABAPKnowledgeBase.Models.Note", "Note")
                         .WithMany("Images")
-                        .HasForeignKey("NoteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Note");
-                });
-
-            modelBuilder.Entity("ABAPKnowledgeBase.Models.NoteKeyTerm", b =>
-                {
-                    b.HasOne("ABAPKnowledgeBase.Models.Note", "Note")
-                        .WithMany()
                         .HasForeignKey("NoteId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

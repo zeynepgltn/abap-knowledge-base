@@ -20,6 +20,7 @@
     int? selectedCompany = ViewBag.SelectedCompany;
     string? companyName = ViewBag.CompanyName;
     bool canReorder = ViewBag.CanReorder is true;
+    bool pickCompany = ViewBag.PickCompany is true;
     // Alt kategoriler: kategori açıkken (arama değilken) sayfalar alt kategori başlıkları altında gruplanır.
     // Liste sırası: önce Genel (alt kategorisi olmayanlar, varsa), sonra alt kategoriler kendi sırasıyla.
     var subcategories = ViewBag.Subcategories as List<Subcategory> ?? new();
@@ -82,7 +83,7 @@ else
 {
     <section class="screen-head">
         <div class="screen-title"><span class="tcode">@(categoryCode ?? "ARAMA")</span><h1>@(searching ? $"“{query!.Trim()}” için {resultCount} sonuç" : categoryName)@if (companyName is not null) { <span class="hero-sub"> › @companyName</span> }</h1></div>
-        <p class="muted">@(searching ? "En ilgili sonuçlar üstte. Kategori veya etiket seçerek daraltabilirsin. Joker: * birden çok harf, + tek harf (rs*abap*, *çelik*)." : $"{Model.Count} sayfa. Soldan bir sayfa seç, tam içeriği sağda açılır.")</p>
+        <p class="muted">@(pickCompany ? $"{companies.Count} firma. Soldan bir firma seç, sayfaları açılır." : searching ?"En ilgili sonuçlar üstte. Kategori veya etiket seçerek daraltabilirsin. Joker: * birden çok harf, + tek harf (rs*abap*, *çelik*)." : $"{Model.Count} sayfa. Soldan bir sayfa seç, tam içeriği sağda açılır.")</p>
     </section>
     <form method="get" asp-action="Index" class="search">
         <label class="sr-only" for="scope-search">@(selectedCategory.HasValue && !searching ? "Bu kategoride ara" : "Notlarda ara")</label>
@@ -170,6 +171,7 @@ else
            }
            <nav class="note-list" data-reorder="@(canReorder ? "true" : "false")">
            @if (canReorder) { @Html.AntiForgeryToken() }
+           @if (pickCompany) { <p class="muted company-pick">Sayfaları görmek için soldan bir firma seç.</p> }
            @foreach (var item in listItems)
            {
                if (item.IsHead)
@@ -245,7 +247,7 @@ else
               @if (selectedNote.TagNames.Any()) { <div class="doc-source">Etiketler: @string.Join(", ", selectedNote.TagNames)</div> }
               @if (selectedNote.Source is not null) { <div class="doc-source"><partial name="_Source" model="selectedNote" /></div> }
           }
-          else { <div class="reading-empty">@(searching ? "Sonuç bulunamadı. Daha kısa ya da farklı bir ifade dene." : companyName is not null ? "Bu firmada henüz sayfa yok. \"+ Yeni Not\" ile ekleyebilirsin." : "Bu kategori için henüz bir not bulunmuyor.")</div> }
+          else { <div class="reading-empty">@(searching ? "Sonuç bulunamadı. Daha kısa ya da farklı bir ifade dene." : pickCompany ? "Bir firma seç; sayfaları ortada listelenir." : companyName is not null ? "Bu firmada henüz sayfa yok. \"+ Yeni Not\" ile ekleyebilirsin." : "Bu kategori için henüz bir not bulunmuyor.")</div> }
         </article>
     </div>
 }

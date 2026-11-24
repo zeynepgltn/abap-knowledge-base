@@ -6,15 +6,13 @@ using Microsoft.EntityFrameworkCore;
 namespace ABAPKnowledgeBase.Controllers;
 
 // Bir kategorinin alt kategorileri: oluşturma, yeniden adlandırma, silme ve notları yerleştirme tek ekranda.
-// Henüz alt kategorisi olmayan notlar için başlıktan öneri gelir (SubcategoryRules); kullanıcı "Kaydet" demeden
-// hiçbir şey yazılmaz. Seçim değerleri: "" = Genel, "id:5" = var olan alt kategori, "new:Ad" = önerilen yeni alt kategori.
+// Kullanıcı "Kaydet" demeden hiçbir şey yazılmaz. Seçim değerleri: "" = Genel, "id:5" = var olan alt kategori.
 public class SubcategoriesController(NotesDbContext db) : Controller {
  public sealed record SubRow(int Id, string Name, int Count);
- public sealed record NoteRow(int Id, string Title, string Current, string Selected, bool Suggested);
+ public sealed record NoteRow(int Id, string Title, string Selected);
  public sealed class Page {
   public Category Category { get; init; } = null!;
   public List<SubRow> Existing { get; init; } = [];
-  public List<string> Proposed { get; init; } = [];
   public List<NoteRow> Notes { get; init; } = [];
  }
 
@@ -24,29 +22,14 @@ public class SubcategoriesController(NotesDbContext db) : Controller {
   if (category is null) return NotFound();
   var subs = await db.Subcategories.Where(s => s.CategoryId == id).OrderBy(s => s.SortOrder).ThenBy(s => s.Id)
    .Select(s => new SubRow(s.Id, s.Name, s.Notes.Count)).ToListAsync();
-  var byName = subs.ToDictionary(s => s.Name, s => s.Id, StringComparer.OrdinalIgnoreCase);
   var notes = await db.Notes.Where(n => n.CategoryId == id).OrderBy(n => n.SortOrder).ThenBy(n => n.Id)
    .Select(n => new { n.Id, n.Title, n.SubcategoryId }).ToListAsync();
-  var proposed = new List<string>();
-  var rows = notes.Select(n => {
-   var current = n.SubcategoryId is int s ? $"id:{s}" : "";
-   if (current != "") return new NoteRow(n.Id, n.Title, current, current, false);
-   // Sadece "Genel"deki notlara öneri yapılır; kullanıcının yerleştirdiği not yerinde kalır.
-   var name = SubcategoryRules.Suggest(category.Name, n.Title);
-   if (name is null) return new NoteRow(n.Id, n.Title, "", "", false);
-   if (byName.TryGetValue(name, out var existingId)) return new NoteRow(n.Id, n.Title, "", $"id:{existingId}", true);
-   if (!proposed.Contains(name)) proposed.Add(name);
-   return new NoteRow(n.Id, n.Title, "", $"new:{name}", true);
-  }).ToList();
-  // Önerilen yeni adlar kural sırasıyla gösterilir.
-  var order = SubcategoryRules.Names(category.Name).ToList();
-  proposed = proposed.OrderBy(order.IndexOf).ToList();
-  // Satırlar seçili gruba göre dizilir (Genel, var olanlar, öneriler); aynı gruba gidenler alt alta okunur.
+  var rows = notes.Select(n => new NoteRow(n.Id, n.Title, n.SubcategoryId is int s ? $"id:{s}" : "")).ToList();
+  // Satırlar seçili gruba göre dizilir (Genel, var olanlar); aynı gruba gidenler alt alta okunur.
   var groupOrder = new List<string> { "" };
   groupOrder.AddRange(subs.Select(s => $"id:{s.Id}"));
-  groupOrder.AddRange(proposed.Select(p => $"new:{p}"));
   rows = rows.OrderBy(r => groupOrder.IndexOf(r.Selected)).ToList();
-  return View(new Page { Category = category, Existing = subs, Proposed = proposed, Notes = rows });
+  return View(new Page { Category = category, Existing = subs, Notes = rows });
  }
 
  [HttpPost("/Subcategories/{id:int}")][ValidateAntiForgeryToken]
@@ -70,22 +53,17 @@ public class SubcategoriesController(NotesDbContext db) : Controller {
   }
   var keep = subs.Where(s => !deleted.Contains(s.Id)).ToList();
 
-  // 2) Yeni adlar: önerilenler (bir nota seçildiyse) ve elle yazılanlar.
+  // 2) Elle yazılan yeni adlar.
   var picks = (noteSub ?? []).Select(Clean).ToList();
-  var wanted = picks.Where(p => p.StartsWith("new:")).Select(p => p[4..].Trim())
-   .Concat((newName ?? []).Select(Clean)).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-  // Önerilenler kural sırasıyla (ekranda göründüğü gibi) sıralanır, elle yazılanlar sona eklenir.
-  var ruleOrder = SubcategoryRules.Names(category.Name).ToList();
-  wanted = wanted.OrderBy(n => ruleOrder.FindIndex(r => r.Equals(n, StringComparison.OrdinalIgnoreCase)) is var i && i >= 0 ? i : int.MaxValue).ToList();
-  var created = new Dictionary<string, Subcategory>(StringComparer.OrdinalIgnoreCase);
+  var wanted = (newName ?? []).Select(Clean).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
   var nextOrder = keep.Count == 0 ? 1 : keep.Max(s => s.SortOrder) + 1;
   foreach (var name in wanted) {
    if (name.Length > 80) { errors.Add($"\"{name[..20]}…\" adı 80 karakterden uzun."); continue; }
    if (name.Equals(Subcategory.General, StringComparison.OrdinalIgnoreCase)) continue; // Genel = alt kategori yok
    var same = keep.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-   if (same is not null) { created[name] = same; continue; }
+   if (same is not null) continue;
    var sub = new Subcategory { CategoryId = id, Name = name, SortOrder = nextOrder++ };
-   db.Subcategories.Add(sub); keep.Add(sub); created[name] = sub;
+   db.Subcategories.Add(sub); keep.Add(sub);
   }
   if (keep.GroupBy(s => s.Name, StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1))
    errors.Add("İki alt kategori aynı adı taşıyamaz.");
@@ -98,11 +76,9 @@ public class SubcategoriesController(NotesDbContext db) : Controller {
   for (var i = 0; i < (noteId?.Length ?? 0); i++) {
    if (!notes.TryGetValue(noteId![i], out var note)) continue;
    var pick = picks.ElementAtOrDefault(i) ?? "";
-   Subcategory? target = pick.StartsWith("id:") && int.TryParse(pick[3..], out var sid) ? keep.FirstOrDefault(s => s.Id == sid)
-    : pick.StartsWith("new:") ? created.GetValueOrDefault(pick[4..].Trim()) : null;
-   // Yeni oluşturulan alt kategorinin Id'si kaydedene kadar 0'dır; o durumda not her zaman taşınır.
-   if (target is null ? note.SubcategoryId is null : target.Id != 0 && note.SubcategoryId == target.Id) continue;
-   if (target is null) note.SubcategoryId = null; else note.Subcategory = target;
+   Subcategory? target = pick.StartsWith("id:") && int.TryParse(pick[3..], out var sid) ? keep.FirstOrDefault(s => s.Id == sid) : null;
+   if (target is null ? note.SubcategoryId is null : note.SubcategoryId == target.Id) continue;
+   note.SubcategoryId = target?.Id;
    moved++;
   }
   db.Subcategories.RemoveRange(subs.Where(s => deleted.Contains(s.Id)));

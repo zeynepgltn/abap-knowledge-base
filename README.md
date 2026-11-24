@@ -1,6 +1,6 @@
 # ABAP Bilgi Bankası — Kişisel Not Uygulaması
 
-**Amaç:** Notu yaz → kategori önerisi al → elle onaylayıp kaydet → başlık/açıklama/kod/etikette ara.
+**Amaç:** Notu yaz → kategorisini seçip kaydet → başlık/açıklama/kod/etikette ara.
 
 ASP.NET Core MVC (.NET 10) + Entity Framework Core + SQLite. Yedekler OneDrive'a gider.
 
@@ -14,7 +14,7 @@ ASP.NET Core MVC (.NET 10) + Entity Framework Core + SQLite. Yedekler OneDrive'a
    dotnet run --urls "http://localhost:5168"
    ```
 
-3. Tarayıcıda **http://localhost:5168** adresine gir. Uygulama ilk çalıştırmada veritabanını ve 11 kategoriyi (10 ABAP konusu + Projeler) oluşturur.
+3. Tarayıcıda **http://localhost:5168** adresine gir. Uygulama ilk çalıştırmada veritabanını ve 12 kategoriyi (10 ABAP konusu + SAP BTP + Projeler) oluşturur.
 
 Veritabanı tek bir dosyadır: `%LOCALAPPDATA%\ABAPKnowledgeBase\abap-notlar.db`. Yeri değiştirilecekse `appsettings.Local.json.example` dosyasına bak. Bu dosya OneDrive klasörüne konmamalı: açıkken senkronlanırsa bozulabilir. OneDrive'a sadece yedekler gider.
 
@@ -37,7 +37,7 @@ Notlar masaüstü OneNote'tan (resimler ve resimlerin OCR metni dahil) aktarıl�
    ```
 
    `ImportData/onenote/onizleme.md` her sayfanın kategorisini ve nedenini, `onizleme-govdeler.txt` dönüştürülmüş metni gösterir. ⚠ işaretli satırlarda bölüm ile içerik çelişiyor.
-   Kategoriler `ImportData/onenote-kategoriler.json` ile belirlenir (ilk seferde `onenote-kategoriler.example.json` dosyasını bu adla kopyala). Öncelik sırası: `"defter/bölüm/başlık"`, sonra `"defter/bölüm"`, sonra `"defter/*"`. Boş değer verilen veya listede olmayan sayfalar kategori önericiye bırakılır.
+   Kategoriler `ImportData/onenote-kategoriler.json` ile belirlenir (ilk seferde `onenote-kategoriler.example.json` dosyasını bu adla kopyala). Öncelik sırası: `"defter/bölüm/başlık"`, sonra `"defter/bölüm"`, sonra `"defter/*"`. Boş değer verilen veya listede olmayan sayfalar `ABAP Temelleri` kategorisine düşer (önizlemede `VARSAYILAN (eşleme yok)` yazar).
 
 3. Uygula:
 
@@ -72,7 +72,7 @@ Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resi
 - Sayfaları sürükle-bırak ile sıralama
 - OneNote'tan resimleriyle aktarım; resimlerdeki yazıda (OCR) arama
 - Açık / koyu tema
-- 10 ABAP kategorisi + Projeler; ABAP terimlerine dayalı kategori önerisi (tam kelime eşleşmesi, ağırlıklı puan, kullanıcı onaylı)
+- 10 ABAP kategorisi + SAP BTP + Projeler
 - Teknik sembolleri de (`?=`, `VALUE #(`) arayan arama: en ilgili sonuç üstte (başlık > etiket > kod > metin > resimdeki yazı), her sonuçta vurgulu pasaj, kategori ve etiket filtreleri; açılan notta eşleşmeler işaretlenir
 - Arama kabul testi: uygulama açıkken `powershell -ExecutionPolicy Bypass -File scripts\Test-Search.ps1` → `tests/arama-testleri.json`'daki sorgularda beklenen not ilk 5'te mi ölçer
 - Etiketler ve kaynaklar ayrı tablolarda: bir etiket birçok notta kullanılır; kaynak OneNote bölümü (`OneNote: defter › bölüm`), dosya adı veya web adresidir, formda metin olarak girilir. `https://...` ya da `www.` ile başlayan kaynak notta tıklanabilir link olur (yeni sekmede açılır)
@@ -83,37 +83,12 @@ Not gövdesinde ```` ``` ```` satırları arası kod bloğu, tek başına `[resi
 
 ## Günün Quiz'i
 
-Menüdeki **Günün Quiz'i** her gün notlardan 8 soru hazırlar: 5 mantık + 3 kod; 2 kolay + 5 orta + 1 zor. Ücretli servis kullanmaz, tamamen yerel çalışır.
+Menüdeki **Günün Quiz'i** sayfası, cevaplama, Leitner kutuları ve istatistiklerle hazır; ancak **soru üretici şu an bağlı değil**. Sorular `Services/QuizService.cs` içindeki `GenerateAsync` metodunun döndürdüğü listeden gelir; bu metot şimdilik boş liste döner ve sayfa "Henüz soru yok" gösterir.
 
-| # | Tür · Zorluk | Soru tipi |
-|---|---|---|
-| 1–2 | Mantık · Kolay | Açıklaması verilen kavram hangisi? |
-| 3 | Mantık · Orta | Notun bir cümlesinde boşluğa hangi terim gelir? |
-| 4 | Mantık · Orta | Kavramın doğru açıklaması hangisi? |
-| 5 | Mantık · Orta | Hangisi bu notun kavramlarından biri değil? |
-| 6–7 | Kod · Orta | Bu kod satırı ne yapar? / Koddaki boşluğa hangi anahtar kelime gelir? |
-| 8 | Kod · Zor | Kod parçasındaki hatalı satır hangisi? |
-
-Bir tip için uygun not bulunamazsa o yerde başka bir tip sorulur.
-
-- **Sorular nereden gelir:** notlardaki `KAVRAM: açıklama` ve `KAVRAM | açıklama` satırları ile kod bloklarından, kurallarla (`Services/QuizMaterial.cs`, `Services/RuleQuizGenerator.cs`). Not ne kadar bu düzende yazılırsa sorular o kadar iyi olur.
-- **Anahtar terimler (aşama 2, TF-IDF):** `ml/anahtar_terimler.py` (Python, pandas, scikit-learn) her notun onu en iyi ayırt eden terimlerini bulup `NoteKeyTerms` tablosuna yazar. Boşluk doldurma sorusu bu terimlerden birini notun bir cümlesinde gizler; yanlış şıklar başka notların aynı yazım kalıbındaki terimleridir (işlem koduna işlem kodu: SE37 → SE14, SE11...). Böylece `KAVRAM: açıklama` düzeninde yazılmamış notlar da sorulabilir. Quiz hazırlanırken not eklenmiş/değişmişse betik otomatik çalışır; Python ortamı kurulu değilse quiz bu soru tipi olmadan çalışır.
-- **Aralıklı tekrar (Leitner):** doğru cevap notu bir üst kutuya taşır (1, 2, 4, 8, 16 gün sonra yeniden sorulur), yanlış cevap 1. kutuya geri gönderir. Önce yanlış bilinenler, sonra hiç sorulmamış notlar gelir.
-- **Gün boyu aynı quiz:** sorular veritabanına yazılır; yedekle diğer bilgisayara da geçer.
-- **↻ Yeni quiz:** istediğin an yeni 8 soru. Hiç cevap vermediysen sorular yerinde yenilenir; cevap verdiysen aynı gün yeni bir tur açılır (2. tur, 3. tur...). Cevapladığın sorular ve 👍/👎 puanları kaydedilir, cevaplanmamışlar silinir (yarım quiz'de önce onay sorulur). O gün sorulmuş notlar yeni turda tekrar sorulmaz.
-- **👍 / 👎:** her cevaptan sonra sorunun iyi olup olmadığını işaretle. Bu puanlar ileride soru kalitesini ölçmek ve makine öğrenmesi modeli eğitmek için veri seti olacak.
-- **Kapsam:** `appsettings.json` → `Quiz:ExcludeCategories` (varsayılan: Projeler, firmaya özel notlar).
-- **Önizleme:** `dotnet run -- --quiz-onizleme 7` kaydetmeden 7 günlük örnek quiz yazar.
-
-### Python ortamı (bir kez, her bilgisayarda)
-
-```powershell
-py -m venv ml\.venv
-ml\.venv\Scripts\python.exe -m pip install -r ml\requirements.txt
-ml\.venv\Scripts\python.exe ml\anahtar_terimler.py --onizle 5   # yazmadan 5 notun terimlerini gösterir
-```
-
-Elle çalıştırmak gerekmez; uygulama quiz hazırlarken gerekirse kendisi çalıştırır. Terimler notlardan türetildiği için her an yeniden hesaplanabilir.
+- **Aralıklı tekrar (Leitner):** doğru cevap notu bir üst kutuya taşır (1, 2, 4, 8, 16 gün sonra yeniden sorulur), yanlış cevap 1. kutuya geri gönderir.
+- **Gün boyu aynı quiz:** sorular veritabanına yazılır; yedekle diğer bilgisayara da geçer. Soru üretilmeyen gün kaydedilmez.
+- **↻ Yeni quiz:** hiç cevap vermediysen sorular yerinde yenilenir; cevap verdiysen aynı gün yeni bir tur açılır. Cevapladığın sorular ve 👍/👎 puanları kaydedilir.
+- **Kapsam:** `appsettings.json` → `Quiz:ExcludeCategories` (varsayılan: Projeler, firmaya özel notlar). Bu kapsamdaki notları `QuizService.QuizNotesAsync` verir.
 
 ## Yedekleme ve iki bilgisayar
 
@@ -158,7 +133,6 @@ SQL Server'daki veriye dokunulmaz (sadece okunur); bir şey ters giderse eski h�
 
 ```powershell
 dotnet run -- --backup                     # hemen yedek al, OneDrive'a kopyala ve çık
-dotnet run -- --quiz-onizleme 7            # kaydetmeden 7 günlük örnek quiz yaz
 dotnet run -- --restore-from-cloud         # OneDrive'daki son yedeği yükle
 dotnet run -- --restore "C:\yol\ABAPKnowledgeBase-20261113.db"  # belirli bir günün yedeğini yükle
 ```
@@ -182,25 +156,22 @@ Açık olsa bile tam aktarım (`--import-onenote --apply`, veritabanını silip 
 | Tablo | İçerik |
 |---|---|
 | Notes | Başlık, metin, kod, kategori, firma, kaynak + sayfa no, sıra, tarihler |
-| Categories | 10 ABAP kategorisi + Projeler |
+| Categories | 10 ABAP kategorisi + SAP BTP + Projeler |
 | Companies | Projeler kategorisindeki firmalar |
 | Tags / NoteTags | Etiketler ve not–etiket bağlantıları (çoka çok) |
 | Sources | Notların kaynağı: OneNote defter + bölüm, dosya adı veya web adresi |
 | NoteImages | Resimler ve resimlerden okunan yazı (OCR) |
 | QuizDays / QuizQuestions | Günlük quiz'ler (gün + tur), sorular, verilen cevaplar ve 👍/👎 puanları |
 | NoteReviews | Her notun aralıklı tekrar kutusu ve sonraki tekrar tarihi |
-| NoteKeyTerms | Notların TF-IDF anahtar terimleri (Python betiği yazar, quiz okur) |
 | StickyNotes | Yapışkan notlar: metin, renk, tamamlandı, panodaki sıra |
 
 ## Bilinçli sınırlamalar
 
 - Bu bir **yerel prototip**: **kullanıcı girişi yok, internete açma**.
-- Kategori seçimi otomatik kaydedilmez; önerinin butonuna basarak seçersin.
+- Kategori önerisi yok; kategoriyi formda elle seçersin.
 - Arama her notta "içinde geçiyor mu" kontrolüyle çalışır (büyük/küçük harf ve İ/ı farkı gözetmez), en fazla 1000 aday not inceler. Not sayısı on binlere çıkarsa SQLite FTS5 tam metin aramasına geçilmeli.
 - Veritabanı şeması EF Core migration'larıyla (`Data/Migrations`) yönetilir ve uygulama açılırken otomatik güncellenir. Modele alan eklersen: `dotnet ef migrations add <Ad> --configuration Release --output-dir Data/Migrations` (araç `dotnet tool restore` ile kurulur; uygulama açıkken `bin/Debug` kilitli olduğu için Release kullanılır).
 
 ## Örnek test
-
-Başlık: `?= downcasting`, içerik: `Referans tipi dönüşümü`, kod: `lo_struc ?= cl_abap_typedescr=>describe_by_data( ls_data ).` → **Kategori öner** → Nesne Yönelimli ABAP.
 
 Sitede `?=` veya `CL_GUI_ALV_GRID` araması yaparak test edebilirsin.

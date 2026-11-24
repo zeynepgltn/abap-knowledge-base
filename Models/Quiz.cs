@@ -67,14 +67,3 @@ public class NoteReview {
 
 public static class QuizKind { public const string Logic = "Mantık", Code = "Kod"; }
 public static class QuizDifficulty { public const string Easy = "Kolay", Medium = "Orta", Hard = "Zor"; }
-
-// Notun anahtar terimleri (quiz aşama 2). Python betiği ml/anahtar_terimler.py TF-IDF ile hesaplayıp yazar;
-// C# sadece okur. Rank 1 = notu en iyi ayırt eden terim. Notlar değişince yeniden hesaplanır.
-public class NoteKeyTerm {
- public int NoteId {get;set;}
- public Note? Note {get;set;}
- public int Rank {get;set;}
- [StringLength(120)] public string Term {get;set;}="";
- public double Score {get;set;}
- public DateTime ComputedAt {get;set;}
-}

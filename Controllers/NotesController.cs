@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 namespace ABAPKnowledgeBase.Controllers;
-public class NotesController(NotesDbContext db, ClassificationService classifier) : Controller {
+public class NotesController(NotesDbContext db) : Controller {
  // edit=true: seçili not sağ panelde düzenleme formuyla açılır.
  // company: Projeler kategorisinde sadece o firmanın sayfaları listelenir.
  // tag: arama sonuçlarını bir etikete (OneNote bölümüne) daraltır.
@@ -45,6 +45,15 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
    .OrderBy(c => c.Name, TurkishOrder).ToList();
   // Firma sadece Projeler kategorisinde anlamlıdır.
   if (category != projectsId) company = null;
+  // Projeler'e tıklanınca sayfalar açılmaz, sadece firmalar listelenir; sayfalar firma seçilince gelir.
+  // Bir nota doğrudan gelindiyse (firma verilmeden) o notun firması seçili açılır.
+  bool pickCompany = false;
+  if (category.HasValue && category == projectsId && company is null && string.IsNullOrWhiteSpace(q)) {
+   var noteCompany = note.HasValue ? await db.Notes.Where(n => n.Id == note.Value && n.CategoryId == category.Value).Select(n => n.CompanyId).FirstOrDefaultAsync() : null;
+   if (noteCompany.HasValue) company = noteCompany;
+   else if (!note.HasValue) pickCompany = true;
+  }
+  ViewBag.PickCompany = pickCompany;
   ViewBag.SelectedCompany = company;
   ViewBag.CompanyName = company is null ? null : (ViewBag.Companies as List<CategoryOverview>)!.FirstOrDefault(c => c.Id == company)?.Name;
   if (company.HasValue && ViewBag.CompanyName is null) return NotFound();
@@ -52,7 +61,7 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
    .Include(n => n.NoteTags).ThenInclude(t => t.Tag).AsSplitQuery().AsQueryable();
   if (company.HasValue) notes = notes.Where(n => n.CompanyId == company.Value);
   if (!string.IsNullOrWhiteSpace(q)) return View(await Search(notes, q, category, tag));
-  if (!category.HasValue) return View(new List<Note>());
+  if (!category.HasValue || pickCompany) return View(new List<Note>());
   // Kategori listesi elle verilen sırada gösterilir ve sürüklenerek sıralanabilir.
   ViewBag.CanReorder = true;
   // Alt kategoriler: sayfa listesi bunlara göre gruplanır (boş olanlar da bırakma hedefi olarak görünür).
@@ -296,9 +305,6 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   return RedirectToAction(nameof(Index), new { category = await ProjectsId() });
  }
 
- [HttpPost][ValidateAntiForgeryToken]
- public IActionResult Suggest([FromBody] SuggestRequest? input) => input is null ? BadRequest() : Json(classifier.Suggest($"{input.Title} {input.Body} {input.Code}").Select(x=>new {category=x.Category,score=x.Score,evidence=x.Evidence}));
-
  private async Task LoadCategories() {
   ViewBag.CategoryItems=new SelectList(await db.Categories.OrderBy(c=>c.Id).ToListAsync(),"Id","Name");
   ViewBag.CompanyItems=new SelectList((await db.Companies.ToListAsync()).OrderBy(c=>c.Name, TurkishOrder),"Id","Name");
@@ -339,6 +345,5 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
   await db.SaveChangesAsync();
   return Json(new { stamp = note.UpdatedAt.Ticks.ToString() });
  }
- public sealed record SuggestRequest(string? Title,string? Body,string? Code);
  public sealed class CategoryOverview { public int Id {get;set;} public string Name {get;set;}=""; public int NoteCount {get;set;} }
 }

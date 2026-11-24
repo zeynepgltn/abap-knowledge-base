@@ -13,7 +13,6 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
  public DbSet<QuizDay> QuizDays => Set<QuizDay>();
  public DbSet<QuizQuestion> QuizQuestions => Set<QuizQuestion>();
  public DbSet<NoteReview> NoteReviews => Set<NoteReview>();
- public DbSet<NoteKeyTerm> NoteKeyTerms => Set<NoteKeyTerm>();
  public DbSet<StickyNote> StickyNotes => Set<StickyNote>();
  public DbSet<StickyImage> StickyImages => Set<StickyImage>();
  protected override void OnModelCreating(ModelBuilder modelBuilder) {
@@ -47,10 +46,8 @@ public sealed class NotesDbContext(DbContextOptions<NotesDbContext> options):DbC
    modelBuilder.Entity<QuizQuestion>().HasIndex(x=>new{x.QuizDayId,x.Order}).IsUnique();
    modelBuilder.Entity<NoteReview>().HasOne(x=>x.Note).WithOne().HasForeignKey<NoteReview>(x=>x.NoteId).OnDelete(DeleteBehavior.Cascade);
    modelBuilder.Entity<NoteReview>().HasIndex(x=>x.DueDate);
-   modelBuilder.Entity<NoteKeyTerm>().HasKey(x=>new{x.NoteId,x.Rank});
    modelBuilder.Entity<StickyNote>().HasIndex(x=>new{x.Done,x.SortOrder});
    modelBuilder.Entity<StickyImage>().HasOne(x=>x.StickyNote).WithMany(x=>x.Images).HasForeignKey(x=>x.StickyNoteId).OnDelete(DeleteBehavior.Cascade);
-   modelBuilder.Entity<NoteKeyTerm>().HasOne(x=>x.Note).WithMany().HasForeignKey(x=>x.NoteId).OnDelete(DeleteBehavior.Cascade);
  }
 }
 public static class CategorySeed {
@@ -60,5 +57,7 @@ public static class CategorySeed {
  "ABAP Temelleri", "Internal Table ve Modern ABAP", "SQL, CDS ve Dictionary",
  "Nesne Yönelimli ABAP", "ALV ve Ekran İşlemleri", "Fonksiyonlar, BAPI ve Entegrasyon",
  "Forms ve Yazdırma", "Excel, Dosya ve Mail", "Debug ve Hatalar", "SAP Araçları ve Transport",
- Projects ];
+ Btp, Projects ];
+ // SAP BTP (ABAP Cloud, RAP, CAP, cockpit...): ABAP sürüm yazımından ayrı tutulan platform konusu.
+ public const string Btp = "SAP BTP";
 }

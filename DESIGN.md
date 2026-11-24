@@ -113,7 +113,7 @@ SAP'nin içinde olmayan tek şey: kişinin kendi karalamaları. Bu yüzden siste
 ### Alt kategoriler
 - Her kategori alt kategorilere bölünebilir (ALV › CL GUI ALV, REUSE ALV, SALV...). Alt kategorisi olmayan not "Genel"dedir.
 - Sayfa listesinde alt kategori başlıkları yapışık durur, yanında mono sayı rozeti. Sayfa başka bir başlığın altına sürüklenince o alt kategoriye geçer.
-- "Alt kategorilere böl" ekranı başlıktan öneri yapar (Services/SubcategoryRules.cs); öneriler sarı kesik çizgili ve "öneri" rozetli. Kaydet demeden hiçbir şey yazılmaz.
+- "Alt kategorilere böl" ekranında notlar elle yerleştirilir; Kaydet demeden hiçbir şey yazılmaz.
 
 ### Genellik testi
 - Kategori kartları ızgarası (her SaaS paneli) yerine Z-kodlu indeks tablosu.

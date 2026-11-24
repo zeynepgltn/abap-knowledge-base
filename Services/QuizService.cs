@@ -8,10 +8,14 @@ public sealed record QuizStats(int Streak, int Answered, int Correct, int[] Boxe
 }
 
 /// <summary>
-/// Günün quiz'i: ilk açılışta 8 soru üretilip veritabanına yazılır, gün boyunca aynı quiz gösterilir ("Yeni quiz" ile yeni tur açılır).
+/// Günün quiz'i: ilk açılışta sorular üretilip veritabanına yazılır, gün boyunca aynı quiz gösterilir ("Yeni quiz" ile yeni tur açılır).
 /// Cevaplar notların Leitner kutularını günceller (aralıklı tekrar).
+/// Soru üretimi şu an boş (bkz. GenerateAsync): quiz altyapısı hazır, sorular henüz üretilmiyor.
 /// </summary>
-public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTermsRunner keyTerms) {
+public sealed class QuizService(NotesDbContext db, IConfiguration config) {
+ // QuizDay.Generator alanına yazılan ad. Kendi soru üreticin geldiğinde onun adıyla değiştir.
+ public const string GeneratorName = "yok";
+
  // Kutu → kaç gün sonra yeniden sorulur. Kutu 1: ertesi gün, kutu 5: 16 gün sonra.
  private static readonly int[] Intervals = [0, 1, 2, 4, 8, 16];
  public const int MaxBox = 5;
@@ -27,7 +31,9 @@ public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTer
   var day = await FindAsync(date);
   if (day is not null) return day;
   // Aynı gün aynı tohum: üretim tekrarlanabilir (hata ayıklarken işe yarar).
-  day = new QuizDay { Date = date, Generator = RuleQuizGenerator.Name, Questions = await GenerateAsync(date, new Random(date.DayNumber)) };
+  day = new QuizDay { Date = date, Generator = GeneratorName, Questions = await GenerateAsync(date, new Random(date.DayNumber)) };
+  // Soru yoksa boş tur kaydedilmez; üretici sonradan bağlandığında aynı gün yine soru üretilebilsin.
+  if (day.Questions.Count == 0) return day;
   db.QuizDays.Add(day);
   try { await db.SaveChangesAsync(); }
   catch (DbUpdateException) {
@@ -53,33 +59,24 @@ public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTer
    day.CreatedAt = DateTime.UtcNow;
   } else {
    db.QuizQuestions.RemoveRange(day.Questions.Where(q => !q.Answered));
-   day = new QuizDay { Date = date, Round = day.Round + 1, Generator = RuleQuizGenerator.Name, Questions = questions };
+   day = new QuizDay { Date = date, Round = day.Round + 1, Generator = GeneratorName, Questions = questions };
    db.QuizDays.Add(day);
   }
   await db.SaveChangesAsync();
   return day;
  }
 
- // Kaydetmeden soru üretir (--quiz-onizleme için).
- public Task<List<QuizQuestion>> PreviewAsync(DateOnly date, int seed) => GenerateAsync(date, new Random(seed));
+ // SORU ÜRETİMİ BURAYA: notlardan soru üretip QuizQuestion listesi döndür.
+ // Notlar QuizNotesAsync ile, tekrar kutuları db.NoteReviews ile okunabilir; avoidNotes aynı gün daha önce sorulan notlardır.
+ // Boş liste dönünce quiz sayfası "soru yok" gösterir.
+ private Task<List<QuizQuestion>> GenerateAsync(DateOnly date, Random rng, IReadOnlySet<int>? avoidNotes = null) =>
+  Task.FromResult(new List<QuizQuestion>());
 
- private async Task<List<QuizQuestion>> GenerateAsync(DateOnly date, Random rng, IReadOnlySet<int>? avoidNotes = null) {
-  // Not eklendi/değiştiyse anahtar terimler (TF-IDF) önce Python ile yeniden hesaplanır.
-  await keyTerms.RefreshIfStaleAsync(db);
-  var pool = await LoadPoolAsync();
-  var reviews = await db.NoteReviews.AsNoTracking().ToDictionaryAsync(r => r.NoteId);
-  return new RuleQuizGenerator(rng).Generate(pool, reviews, date, avoidNotes);
- }
-
- public async Task<List<NoteMaterial>> LoadPoolAsync() {
-  // Projeler gibi firmaya özel notlar varsayılan olarak quiz dışında: genel bilgi değil.
+ // Quiz'e girebilecek notlar. Projeler gibi firmaya özel notlar varsayılan olarak dışarıda: genel bilgi değil.
+ public async Task<List<Note>> QuizNotesAsync() {
   var excluded = config.GetSection("Quiz:ExcludeCategories").Get<string[]>() ?? [CategorySeed.Projects];
-  var notes = await db.Notes.AsNoTracking().Include(n => n.Category)
+  return await db.Notes.AsNoTracking().Include(n => n.Category)
    .Where(n => !excluded.Contains(n.Category!.Name)).ToListAsync();
-  var terms = (await db.NoteKeyTerms.AsNoTracking().OrderBy(t => t.Rank).Select(t => new { t.NoteId, t.Term }).ToListAsync())
-   .GroupBy(t => t.NoteId).ToDictionary(g => g.Key, g => g.Select(t => t.Term).ToList());
-  return notes.Select(n => QuizMaterial.Extract(n, n.Category!.Name, terms.GetValueOrDefault(n.Id)))
-   .Where(m => m.Pairs.Count > 0 || m.CodeBlocks.Count > 0 || m.KeyTerms.Count > 0).ToList();
  }
 
  // Cevabı kaydeder ve notun tekrar kutusunu günceller. Bir soru sadece bir kez cevaplanır.
@@ -122,7 +119,7 @@ public sealed class QuizService(NotesDbContext db, IConfiguration config, KeyTer
   var boxes = new int[MaxBox + 1];
   foreach (var g in await db.NoteReviews.GroupBy(r => r.Box).Select(g => new { g.Key, Count = g.Count() }).ToListAsync())
    if (g.Key is >= 1 and <= MaxBox) boxes[g.Key] = g.Count;
-  var poolIds = (await LoadPoolAsync()).Select(m => m.Note.Id).ToList();
+  var poolIds = (await QuizNotesAsync()).Select(n => n.Id).ToList();
   var reviewed = await db.NoteReviews.Select(r => r.NoteId).ToListAsync();
   var due = await db.NoteReviews.CountAsync(r => r.DueDate <= today);
   return new QuizStats(streak, answered.Count, answered.Count(a => a.AnswerIndex == a.CorrectIndex), boxes,

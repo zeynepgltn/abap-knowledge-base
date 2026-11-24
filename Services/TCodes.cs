@@ -20,6 +20,7 @@ public static class TCodes {
   ["Excel, Dosya ve Mail"] = "ZDOSYA",
   ["Debug ve Hatalar"] = "ZDEBUG",
   ["SAP Araçları ve Transport"] = "ZARAC",
+  [CategorySeed.Btp] = "ZBTP",
   [CategorySeed.Projects] = "ZPROJE",
  };
 

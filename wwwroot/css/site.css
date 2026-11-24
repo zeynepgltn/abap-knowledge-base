@@ -561,19 +561,6 @@ textarea { resize: vertical; line-height: 1.55; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 
 .form-card .row-between { margin-top: 12px; }
-.suggestions { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); }
-.suggestions:empty { display: none; }
-button.suggest {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    border-color: var(--accent-border);
-    font-weight: 550;
-    font-size: 13px;
-    padding: 6px 12px;
-    white-space: normal;
-    text-align: left;
-}
-button.suggest:hover { background: var(--accent-hover); border-color: var(--card-hover-border); }
 
 .two { display: grid; grid-template-columns: 1fr 160px; gap: 16px; }
 .two > div { display: flex; flex-direction: column; gap: 6px; }
@@ -1397,13 +1384,10 @@ main.wrap.wide { container-type: inline-size; }
 .subcat-general { border-bottom: 1px solid var(--border-soft); }
 .subcat-count { min-width: 26px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-family: var(--f-mono); font-size: 12px; text-align: center; }
 .form-card .subcat-del { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; margin: 0; color: var(--danger); font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.subcat-row.is-proposed { padding: 0 10px; border: 1px dashed var(--warning); border-radius: 6px; background: color-mix(in srgb, var(--warning) 7%, var(--surface)); }
-.subcat-flag { display: inline-block; margin-left: 8px; padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--warning) 16%, var(--surface)); color: var(--warning); font-size: 11px; font-weight: 700; letter-spacing: .03em; vertical-align: 1px; }
 .subcat-help { margin: 14px 0 0; font-size: 12.5px; line-height: 1.5; }
 .subcat-notes-head { display: flex; align-items: baseline; justify-content: space-between; }
 .subcat-table { margin: 0; padding: 0; list-style: none; }
 .subcat-table li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 230px); align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid var(--border-soft); }
-.subcat-table li.is-suggested { box-shadow: inset 3px 0 0 var(--warning); background: color-mix(in srgb, var(--warning) 5%, transparent); }
 .subcat-table label { margin: 0 !important; font-size: 14px !important; font-weight: 500 !important; overflow-wrap: anywhere; }
 .subcat-table select { padding: 6px 8px; font-size: 13.5px; }
 .subcat-actions { position: sticky; bottom: calc(var(--status-h) + 8px); z-index: 2; margin-top: 16px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: 0 8px 24px var(--shadow); }
@@ -1450,3 +1434,4 @@ mark.hl:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--hl-bg) 60%, var(-
 .hl-tool:not(:disabled):hover { transform: translateY(-1px); }
 .hl-tool:disabled { opacity: .7; cursor: default; }
 .doc-code mark.hl { padding: 0; margin: 0; }
+.company-pick { padding: 16px 14px; margin: 0; font-size: 13px; }

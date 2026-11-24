@@ -40,7 +40,7 @@ public static partial class OneNoteImporter
     // Eşleme dosyasında bu değer, sayfanın/bölümün hiç aktarılmayacağı anlamına gelir.
     private const string SkipMarker = "__ATLA__";
 
-    public static async Task RunAsync(NotesDbContext db, ClassificationService classifier, string importDir, bool apply, bool add = false, bool force = false, bool updateChanged = false)
+    public static async Task RunAsync(NotesDbContext db, string importDir, bool apply, bool add = false, bool force = false, bool updateChanged = false)
     {
         var exportDir = Path.Combine(importDir, "onenote");
         var manifestPath = Path.Combine(exportDir, "manifest.json");
@@ -57,7 +57,7 @@ public static partial class OneNoteImporter
 
         var skipped = pages.Where(p => Lookup(p, mapping).Value == SkipMarker).ToList();
         foreach (var g in skipped.GroupBy(p => p.Notebook)) Console.WriteLine($"Atlanan: {g.Key} - {g.Count()} sayfa");
-        var planned = pages.Except(skipped).Select(p => Plan(p, exportDir, mapping, classifier)).ToList();
+        var planned = pages.Except(skipped).Select(p => Plan(p, exportDir, mapping)).ToList();
         if (add)
         {
             await AddMissingAsync(db, planned, Path.Combine(importDir, "yedek"), Path.Combine(exportDir, "onizleme.md"), apply, updateChanged);
@@ -116,14 +116,12 @@ public static partial class OneNoteImporter
         Console.WriteLine($"OneNote içe aktarma bitti. Eklenen not: {planned.Count}.");
     }
 
-    private static Planned Plan(PageInfo page, string exportDir, Dictionary<string, string> mapping, ClassificationService classifier)
+    private static Planned Plan(PageInfo page, string exportDir, Dictionary<string, string> mapping)
     {
         var note = Convert(page, Path.Combine(exportDir, page.File));
         var section = string.IsNullOrEmpty(page.SectionGroups) ? page.Section : $"{page.SectionGroups}/{page.Section}";
         string? category = null, method;
         var (key, value) = Lookup(page, mapping);
-        var ocr = string.Join(' ', note.Images.Select(i => i.OcrText));
-        var best = classifier.Suggest($"{note.Title} {note.Body} {ocr}").FirstOrDefault();
         string? company = null;
         // "Projeler:MOROCCO-FAS": Projeler kategorisi, firma MOROCCO-FAS.
         if (value is not null && value.StartsWith(CategorySeed.Projects + ":"))
@@ -136,11 +134,7 @@ public static partial class OneNoteImporter
             category = value;
             method = !key!.EndsWith("/*") ? (key == $"{page.Notebook}/{section}" ? "bölüm" : "sayfa") : key == $"{page.Notebook}/*" ? "defter" : "grup";
         }
-        else if (best.Category is not null) { category = best.Category; method = $"öneri: {best.Evidence}"; }
-        else method = "VARSAYILAN (öneri yok)";
-        // Eşleme ile içerik güçlü biçimde çelişiyorsa önizlemede işaretle; karar kullanıcının.
-        if (category is not null && method is "bölüm" or "grup" or "defter" && best.Category is not null && best.Category != category && best.Score >= 6)
-            method += $" ⚠ içerik: {best.Category} ({best.Evidence})";
+        else method = "VARSAYILAN (eşleme yok)";
         category ??= "ABAP Temelleri";
         if (category == CategorySeed.Projects && string.IsNullOrEmpty(company)) company = page.Section.Trim();
         if (company is { Length: > 100 }) company = company[..100];

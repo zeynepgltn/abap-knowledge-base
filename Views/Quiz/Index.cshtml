@@ -9,7 +9,7 @@
  string Level(string d) => d == QuizDifficulty.Easy ? "easy" : d == QuizDifficulty.Hard ? "hard" : "medium";
  ViewData["Title"] = "Günün Quiz'i";
  ViewData["TCode"] = TCodes.Quiz;
- ViewData["Description"] = $"Notlardan üretilen günlük ABAP quiz'i: {day.Questions.Count} soru, Leitner kutularıyla aralıklı tekrar.";
+ ViewData["Description"] = $"Günlük ABAP quiz'i: {day.Questions.Count} soru, Leitner kutularıyla aralıklı tekrar.";
 }
 <div class="row-between quiz-head">
  <div>
@@ -32,7 +32,7 @@
 </div>
 
 @if (day.Questions.Count == 0) {
- <p class="reading-empty">Soru üretilecek kadar not bulunamadı. Notlarına “KAVRAM: açıklama” satırları veya kod blokları ekledikçe sorular oluşur.</p>
+ <p class="reading-empty">Henüz soru yok: soru üretici bağlı değil (Services/QuizService.cs › GenerateAsync).</p>
 }
 @if (day.CompletedAt is not null) {
  <div class="quiz-done" role="status"><b>Quiz bitti: @correct/@day.Questions.Count doğru.</b> Yanlış yaptığın notlar yarın tekrar gelecek, doğrular daha seyrek sorulacak. Devam etmek istersen <b>↻ Yeni quiz</b>.</div>
