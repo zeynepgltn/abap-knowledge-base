@@ -1,12 +1,15 @@
 @model Note
 @using ABAPKnowledgeBase.Services
-@* Not gövdesini metin, kod bloğu ve resim parçalarına ayırarak çizer. *@
-@foreach (var part in NoteBody.Parse(Model.Body))
+@* Not gövdesini metin, kod bloğu ve resim parçalarına ayırarak çizer.
+   Metin ve kod parçaları fosforlu kalem için işaretlenir: data-seg = parça no, data-o = işaretsiz metindeki konum (site.js). *@
+@{ var segments = NoteBody.Parse(Model.Body); }
+@for (var si = 0; si < segments.Count; si++)
 {
+    var part = segments[si];
     switch (part.Kind)
     {
         case NoteBody.Kind.Code:
-            <pre class="doc-code" tabindex="0"><code>@part.Text</code></pre>
+            <pre class="doc-code" tabindex="0"><code data-seg="@si">@NoteBody.RenderRuns(part.Text)</code></pre>
             break;
         case NoteBody.Kind.Image:
             @* v: not değişince adres de değişir; tarayıcı önbellekteki eski resmi göstermez. *@
@@ -14,7 +17,7 @@
                  src="@Url.Action("Image", "Notes", new { noteId = Model.Id, order = part.ImageOrder, v = Model.UpdatedAt.Ticks })" />
             break;
         default:
-            <div class="body-text">@part.Text</div>
+            <div class="body-text" data-seg="@si">@NoteBody.RenderRuns(part.Text)</div>
             break;
     }
 }

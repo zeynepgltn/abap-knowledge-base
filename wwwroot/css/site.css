@@ -1412,3 +1412,41 @@ main.wrap.wide { container-type: inline-size; }
     .subcat-list { position: static; }
     .subcat-table li { grid-template-columns: 1fr; gap: 6px; }
 }
+
+/* ---------- Fosforlu kalem ---------- */
+/* Arama işaretinden (mark) ayrı: kalıcı, sarı fosfor, satır kırılınca her satırda ayrı kutu. */
+:root { --hl-bg: #ffe45c; --hl-text: #1d1a05; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --hl-bg: rgba(250, 204, 21, .32); --hl-text: #fff6cf; } }
+:root[data-theme="dark"] { --hl-bg: rgba(250, 204, 21, .32); --hl-text: #fff6cf; }
+mark.hl {
+    padding: 0 2px; margin: 0 -1px; border-radius: 3px;
+    background: var(--hl-bg); color: var(--hl-text);
+    -webkit-box-decoration-break: clone; box-decoration-break: clone;
+    cursor: pointer; transition: box-shadow .14s var(--ease);
+}
+mark.hl:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--hl-bg) 60%, var(--warning)); }
+.hl-bubble, .hl-bubble:hover {
+    position: fixed; z-index: 60;
+    display: inline-flex; align-items: center; gap: 6px;
+    min-height: 34px; padding: 0 12px;
+    border: 0; border-radius: 6px;
+    background: var(--text-strong); color: var(--bg);
+    font-size: 13px; font-weight: 650;
+    box-shadow: 0 8px 24px var(--shadow);
+    animation: hl-in .16s var(--ease);
+}
+.hl-bubble:hover { background: var(--accent); color: var(--on-accent); }
+.hl-bubble[hidden] { display: none; }
+@keyframes hl-in { from { opacity: 0; transform: translateY(4px); } }
+.field-hint { margin: 6px 0 0; font-size: 12.5px; }
+/* Başlıktaki "✎ Vurgula": seçim yokken soluk, seçim varken fosfor sarısı. */
+.doc-tools { display: inline-flex; align-items: center; gap: 14px; }
+.hl-tool, .hl-tool:hover {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted);
+    font-size: 13px; font-weight: 650; transform: none; box-shadow: none;
+}
+.hl-tool:not(:disabled) { border-color: color-mix(in srgb, var(--hl-bg) 70%, var(--warning)); background: var(--hl-bg); color: var(--hl-text); cursor: pointer; }
+.hl-tool:not(:disabled):hover { transform: translateY(-1px); }
+.hl-tool:disabled { opacity: .7; cursor: default; }
+.doc-code mark.hl { padding: 0; margin: 0; }

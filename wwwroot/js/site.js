@@ -30,6 +30,33 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(top+row.offsetHeight>list.scrollTop+list.clientHeight)list.scrollTop=top-list.clientHeight/3;
  }
  // Sayfa listesinde sürükle-bırak ile sıralama; bırakınca yeni sıra sunucuya kaydedilir.
+ // Okuma ekranı: soldaki listelerden bir nota/kategoriye tıklanınca sayfa yeniden yüklenir; kaydırma konumu kaybolmasın diye
+ // listelerin kaydırması ve sayfanın konumu kısa süreliğine saklanır, yeni sayfada geri konur. Not, ekranın üstünden açılır.
+ const layout=document.querySelector('.reading-layout');
+ if(layout){
+  const KEY='okuma-konum';
+  layout.addEventListener('click',e=>{
+   const link=e.target.closest('.note-sidebar a[href]'); if(!link||e.ctrlKey||e.metaKey||e.shiftKey||e.button!==0)return;
+   try{sessionStorage.setItem(KEY,JSON.stringify({t:Date.now(),y:scrollY,lists:[...layout.querySelectorAll('.note-list')].map(l=>l.scrollTop)}));}catch{}
+  });
+  let saved=null; try{saved=JSON.parse(sessionStorage.getItem(KEY)||'null'); sessionStorage.removeItem(KEY);}catch{}
+  const lists=[...layout.querySelectorAll('.note-list')];
+  if(saved&&Date.now()-saved.t<15000){
+   lists.forEach((l,i)=>{if(saved.lists[i]!=null)l.scrollTop=saved.lists[i];});
+   const header=document.querySelector('header.session-bar')?.offsetHeight??0;
+   const doc=layout.querySelector('.note-document');
+   const docTop=doc?doc.getBoundingClientRect().top+scrollY-header-12:0;
+   const stacked=getComputedStyle(layout.querySelector('.note-sidebar')).position!=='sticky'; // telefonda liste notun üstünde
+   // Kullanıcı notun hizasına kadar inmişse (ya da telefondaysa) yeni not baştan görünsün; değilse sayfa olduğu yerde kalsın.
+   scrollTo({top:stacked||saved.y>docTop?docTop:saved.y,behavior:'instant'});
+  }
+  // Seçili satır listede görünmüyorsa görünür yapılır (sayfa kaydırılmadan).
+  for(const l of lists){
+   const active=l.querySelector('.active'); if(!active)continue;
+   const a=active.getBoundingClientRect(), b=l.getBoundingClientRect();
+   if(a.top<b.top||a.bottom>b.bottom)l.scrollTop+=a.top-b.top-b.height/3;
+  }
+ }
  const reorderList=document.querySelector('.note-list[data-reorder="true"]');
  if(reorderList){
   let dragged=null, before=null, beforeGroup=null;
@@ -66,6 +93,95 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!r.ok)throw new Error();
    }catch{alert('Sıralama kaydedilemedi; sayfa yenilenecek.');location.reload();}
   });
+ }
+ // Fosforlu kalem: okunan notta metin (kod dahil) seçilince başlıktaki "✎ Vurgula" düğmesi açılır ve seçimin sonunda
+ // aynı işi yapan küçük bir balon çıkar (Edge'in kendi seçim menüsü seçimin üstüne çıktığı için balon sağda/altta durur).
+ // Kısayol: seçim varken H. Vurguya tıklayınca "Vurguyu kaldır". Konumlar sunucunun çizdiği data-seg (parça; -1 = ABAP kod
+ // örneği alanı) ve data-o (işaretsiz metindeki konum) ile hesaplanır. Birden çok parçaya yayılan seçim parça parça kaydedilir.
+ const markerBody=document.querySelector('[data-marker-note]');
+ if(markerBody){
+  const token=()=>document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+  const tool=document.querySelector('[data-hl-tool]');
+  const bubble=document.createElement('button');
+  bubble.type='button'; bubble.className='hl-bubble'; bubble.hidden=true; document.body.append(bubble);
+  let pending=null, current=null; // pending: balondaki iş; current: o anki seçimden çıkan iş
+  const hide=()=>{bubble.hidden=true; pending=null;};
+  // Balon seçimin son satırının sağına; sığmazsa altına konur.
+  const show=(rect,label,job)=>{
+   pending=job; bubble.innerHTML=label; bubble.hidden=false;
+   const w=bubble.offsetWidth, h=bubble.offsetHeight;
+   let x=rect.right+8, y=rect.top+rect.height/2-h/2;
+   if(x+w>innerWidth-8){x=Math.max(8,Math.min(rect.right-w,innerWidth-w-8)); y=rect.bottom+8;}
+   bubble.style.left=x+'px'; bubble.style.top=Math.max(8,y)+'px';
+  };
+  // (düğüm, ofset) → {seg, o}. Seçim sınırı parçanın kendisindeyse ofset çocuk sırasıdır.
+  const pos=(node,off)=>{
+   let el=node.nodeType===1?node:node.parentElement; if(!el)return null;
+   if(el.matches('[data-seg]')){
+    const kids=[...el.children]; if(off<kids.length)return {seg:el,o:+kids[off].dataset.o};
+    return {seg:el,o:el.textContent.length};
+   }
+   el=el.closest('[data-o]'); if(!el||!markerBody.contains(el))return null;
+   const r=document.createRange(); r.setStart(el,0); r.setEnd(node,off);
+   return {seg:el.closest('[data-seg]'),o:+el.dataset.o+r.toString().length};
+  };
+  const fromSelection=()=>{
+   const sel=getSelection(); if(!sel||sel.isCollapsed||sel.rangeCount===0)return null;
+   // Seçim notun dışına taşsa da (fare sağdaki panele kadar sürüklenince) notun içindeki kısmı alınır.
+   const range=sel.getRangeAt(0).cloneRange(); if(!range.intersectsNode(markerBody))return null;
+   const inner=document.createRange(); inner.selectNodeContents(markerBody);
+   if(range.compareBoundaryPoints(Range.START_TO_START,inner)<0)range.setStart(inner.startContainer,inner.startOffset);
+   if(range.compareBoundaryPoints(Range.END_TO_END,inner)>0)range.setEnd(inner.endContainer,inner.endOffset);
+   if(range.collapsed)return null;
+   const segs=[...markerBody.querySelectorAll('[data-seg]')].filter(s=>range.intersectsNode(s));
+   const a=pos(range.startContainer,range.startOffset), b=pos(range.endContainer,range.endOffset);
+   const ranges=segs.map(s=>({seg:+s.dataset.seg,el:s,
+    start:a&&a.seg===s?a.o:0,
+    end:b&&b.seg===s?b.o:s.textContent.length})).filter(r=>r.end>r.start&&!/^\s*$/.test(r.el.textContent.slice(r.start,r.end)));
+   if(!ranges.length)return null;
+   const rects=[...range.getClientRects()].filter(r=>r.width>0);
+   return {ranges:ranges.map(({el,...r})=>r),rect:rects.at(-1)||range.getBoundingClientRect()};
+  };
+  const refresh=async()=>{
+   const html=await (await fetch(location.href,{headers:{'X-Requested-With':'fetch'}})).text();
+   const fresh=new DOMParser().parseFromString(html,'text/html').querySelector('[data-marker-note]');
+   if(fresh){markerBody.innerHTML=fresh.innerHTML; markerBody.dataset.stamp=fresh.dataset.stamp;}
+  };
+  const run=async job=>{
+   if(!job)return; hide(); getSelection()?.removeAllRanges(); current=null; if(tool)tool.disabled=true;
+   try{
+    for(const r of job.ranges){
+     const res=await fetch('/Notes/Mark',{method:'POST',headers:{'Content-Type':'application/json','RequestVerificationToken':token()},
+      body:JSON.stringify({id:+markerBody.dataset.markerNote,segment:r.seg,start:r.start,end:r.end,on:job.on,stamp:markerBody.dataset.stamp})});
+     if(res.status===409){alert('Not bu arada değişmiş; sayfa yenileniyor.'); location.reload(); return;}
+     if(!res.ok)throw new Error(res.status);
+     markerBody.dataset.stamp=(await res.json()).stamp;
+    }
+    await refresh();
+   }catch{alert('Vurgu kaydedilemedi.');}
+  };
+  // Seçim değiştikçe başlıktaki düğme açılır/kapanır.
+  document.addEventListener('selectionchange',()=>{const s=fromSelection(); current=s?{ranges:s.ranges,on:true}:null; if(tool)tool.disabled=!current;});
+  for(const b of [bubble,tool].filter(Boolean)) b.addEventListener('mousedown',e=>e.preventDefault()); // seçim kaybolmasın
+  bubble.addEventListener('click',()=>run(pending));
+  tool?.addEventListener('click',()=>run(current));
+  const onSelect=()=>{
+   const s=fromSelection();
+   if(s)show(s.rect,'<span aria-hidden="true">✎</span> Vurgula',{ranges:s.ranges,on:true}); else if(pending?.on)hide();
+  };
+  document.addEventListener('mouseup',e=>{if(e.target!==bubble&&e.target!==tool)setTimeout(onSelect,0);});
+  document.addEventListener('keyup',e=>{if(e.shiftKey||e.key==='Shift')onSelect();});
+  document.addEventListener('keydown',e=>{
+   if(e.key==='Escape')hide();
+   if((e.key==='h'||e.key==='H')&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&current&&!e.target.closest?.('input,textarea,select,[contenteditable]')){e.preventDefault(); run(current);}
+  });
+  markerBody.addEventListener('click',e=>{
+   const m=e.target.closest('mark.hl'); if(!m||!getSelection().isCollapsed)return;
+   const seg=m.closest('[data-seg]'), o=+m.dataset.o;
+   show(m.getBoundingClientRect(),'<span aria-hidden="true">⌫</span> Vurguyu kaldır',{ranges:[{seg:+seg.dataset.seg,start:o,end:o+m.textContent.length}],on:false});
+  });
+  document.addEventListener('mousedown',e=>{if(e.target!==bubble&&!e.target.closest?.('mark.hl'))hide();});
+  addEventListener('scroll',hide,{passive:true,capture:true});
  }
  // Arama sonucunda açılan notta aranan ifade işaretlenir ve ilk eşleşmeye kaydırılır.
  // İfade bir arada geçmiyorsa kelimeler ayrı ayrı işaretlenir.

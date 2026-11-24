@@ -82,7 +82,7 @@ public static partial class NoteSearch {
  [GeneratedRegex(@"\s+")]
  private static partial Regex Spaces();
  // Pasajda kod bloğu ve resim işaretleri gösterilmez, satır sonları tek boşluğa iner.
- private static string? Clean(string? text) => string.IsNullOrEmpty(text) ? text : Spaces().Replace(Markers().Replace(text, " "), " ").Trim();
+ private static string? Clean(string? text) => string.IsNullOrEmpty(text) ? text : Spaces().Replace(Markers().Replace(NoteBody.Plain(text), " "), " ").Trim();
 
  // Başlıkta vurgulamak için: (öncesi, eşleşen, sonrası). İfade yoksa ilk geçen kelime; hiçbiri yoksa eşleşen boştur.
  public static (string Before, string Match, string After) Split(string text, string query) {

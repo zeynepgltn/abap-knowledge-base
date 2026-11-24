@@ -231,14 +231,17 @@ else
           }
           else if (selectedNote is not null)
           {
-              <div class="doc-top"><span class="doc-kicker">@selectedNote.Category?.Name@if (selectedNote.Subcategory is not null) { <text> › @selectedNote.Subcategory.Name</text> }@if (selectedNote.Company is not null) { <text> › @selectedNote.Company.Name</text> }</span><span><a asp-action="Index" asp-route-category="@selectedCategory" asp-route-q="@query" asp-route-company="@selectedCompany" asp-route-note="@selectedNote.Id" asp-route-edit="true">Düzenle</a><partial name="_DeleteForm" model="selectedNote" /></span></div>
+              <div class="doc-top"><span class="doc-kicker">@selectedNote.Category?.Name@if (selectedNote.Subcategory is not null) { <text> › @selectedNote.Subcategory.Name</text> }@if (selectedNote.Company is not null) { <text> › @selectedNote.Company.Name</text> }</span><span class="doc-tools"><button type="button" class="hl-tool" data-hl-tool disabled title="Metni seç, sonra bas (kısayol: H)"><span aria-hidden="true">✎</span> Vurgula</button><a asp-action="Index" asp-route-category="@selectedCategory" asp-route-q="@query" asp-route-company="@selectedCompany" asp-route-note="@selectedNote.Id" asp-route-edit="true">Düzenle</a><partial name="_DeleteForm" model="selectedNote" /></span></div>
               <h2 class="doc-title">@selectedNote.Title</h2>
               <div class="doc-date">Son düzenleme: @selectedNote.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+              @* Fosforlu kalem alanı: not metni, kod bölümleri ve ABAP kod örneği (data-seg="-1"). Seçim yapılınca başlıktaki "Vurgula" açılır. *@
+              <div class="doc-markable" data-marker-note="@selectedNote.Id" data-stamp="@selectedNote.UpdatedAt.Ticks">
               <div class="doc-body" data-highlight="@(searching ? query!.Trim() : "")"><partial name="_NoteBody" model="selectedNote" /></div>
               @if (!string.IsNullOrWhiteSpace(selectedNote.Code))
               {
-                  <h3>ABAP Kod Örneği</h3><pre class="doc-code" tabindex="0"><code>@selectedNote.Code</code></pre>
+                  <h3>ABAP Kod Örneği</h3><pre class="doc-code" tabindex="0"><code data-seg="-1">@NoteBody.RenderRuns(selectedNote.Code)</code></pre>
               }
+              </div>
               @if (selectedNote.TagNames.Any()) { <div class="doc-source">Etiketler: @string.Join(", ", selectedNote.TagNames)</div> }
               @if (selectedNote.Source is not null) { <div class="doc-source"><partial name="_Source" model="selectedNote" /></div> }
           }

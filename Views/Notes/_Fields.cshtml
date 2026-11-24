@@ -3,6 +3,7 @@
 @{ var existingImages = Model.Id > 0 ? NoteBody.Parse(Model.Body).Where(p => p.Kind == NoteBody.Kind.Image).Select(p => p.ImageOrder).Distinct().ToList() : new List<int>(); }
 <div asp-validation-summary="All" class="error"></div><label asp-for="Title">Başlık</label><input asp-for="Title" placeholder="Örn: ?= downcasting operatörü" required maxlength="180" />
 <label asp-for="Body">Açıklama / not</label><textarea asp-for="Body" rows="9" required placeholder="Ne işe yarar? Ne zaman kullanılır? ..."></textarea>
+<p class="muted field-hint">Fosforlu kalem: notu okurken metni (kod dahil) seçip başlıktaki "✎ Vurgula"ya bas. Burada ⟦böyle⟧ görünür; işaretleri silersen vurgu kalkar.</p>
 @* Resimler: seç, açıklama kutusuna yapıştır (Ctrl+V) veya sürükle-bırak. Resim imlecin olduğu yere "[resim]" satırı olarak girer (site.js). *@
 <div class="image-tools" data-image-tools>
  <button type="button" class="secondary" data-image-pick>🖼 Resim ekle</button>

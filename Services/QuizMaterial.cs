@@ -63,19 +63,23 @@ public static partial class QuizMaterial {
   var all = new List<string> { note.Title };
   foreach (var seg in NoteBody.Parse(note.Body)) {
    if (seg.Kind == NoteBody.Kind.Code) {
-    var lines = seg.Text.Split('\n').Select(l => l.TrimEnd()).Where(IsCodeLine).ToList();
+    var code = NoteBody.Plain(seg.Text);
+    var lines = code.Split('\n').Select(l => l.TrimEnd()).Where(IsCodeLine).ToList();
     if (lines.Count > 0) m.CodeBlocks.Add(lines);
-    all.Add(seg.Text);
+    all.Add(code);
    } else if (seg.Kind == NoteBody.Kind.Text) {
-    all.Add(seg.Text);
-    ReadPairs(seg.Text, m.Pairs);
-    ReadSentences(seg.Text, m.Sentences);
+    // Fosforlu kalem işaretleri (⟦ ⟧) quiz metnine girmez.
+    var text = NoteBody.Plain(seg.Text);
+    all.Add(text);
+    ReadPairs(text, m.Pairs);
+    ReadSentences(text, m.Sentences);
    }
   }
   if (!string.IsNullOrWhiteSpace(note.Code)) {
-   var lines = note.Code.Replace("\r\n", "\n").Split('\n').Select(l => l.TrimEnd()).Where(IsCodeLine).ToList();
+   var code = NoteBody.Plain(note.Code);
+   var lines = code.Replace("\r\n", "\n").Split('\n').Select(l => l.TrimEnd()).Where(IsCodeLine).ToList();
    if (lines.Count > 0) m.CodeBlocks.Add(lines);
-   all.Add(note.Code);
+   all.Add(code);
   }
   m.AllText = string.Join("\n", all);
   // Aynı kavram notta iki kez tanımlanmışsa ilki kalır.

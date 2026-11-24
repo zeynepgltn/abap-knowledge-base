@@ -317,6 +317,28 @@ public class NotesController(NotesDbContext db, ClassificationService classifier
  private async Task CheckSubcategory(Note note) {
   if (note.SubcategoryId is int id && !await db.Subcategories.AnyAsync(s => s.Id == id && s.CategoryId == note.CategoryId)) note.SubcategoryId = null;
  }
+ // Fosforlu kalem: okuma ekranında seçilen metin vurgulanır (On=true) ya da vurgusu kaldırılır.
+ // Segment/Start/End: metin parçasının sırası ve işaretsiz metindeki konumlar (_NoteBody data-seg / data-o).
+ // Stamp: sayfadaki notun UpdatedAt'i; not bu arada başka yerde değiştiyse 409 döner, eski görünüm üzerine yazılmaz.
+ // Stamp metin olarak gelir: tick sayısı JavaScript'in tam sayı sınırını (2^53) aşar, sayı olsa yuvarlanırdı.
+ public sealed record MarkRequest(int Id, int Segment, int Start, int End, bool On, string? Stamp);
+ [HttpPost][ValidateAntiForgeryToken]
+ public async Task<IActionResult> Mark([FromBody] MarkRequest r) {
+  var note = await db.Notes.FirstOrDefaultAsync(n => n.Id == r.Id);
+  if (note is null) return NotFound();
+  if (note.UpdatedAt.Ticks.ToString() != r.Stamp) return Conflict();
+  // Segment -1: notun ayrı "ABAP kodu" alanı; diğerleri gövdedeki metin/kod parçaları.
+  if (r.Segment == -1) {
+   if (NoteBody.SetMarkText(note.Code, r.Start, r.End, r.On) is not { } code) return BadRequest();
+   note.Code = code;
+  } else {
+   if (NoteBody.SetMark(note.Body, r.Segment, r.Start, r.End, r.On) is not { } body) return BadRequest();
+   note.Body = body;
+  }
+  note.UpdatedAt = DateTime.UtcNow;
+  await db.SaveChangesAsync();
+  return Json(new { stamp = note.UpdatedAt.Ticks.ToString() });
+ }
  public sealed record SuggestRequest(string? Title,string? Body,string? Code);
  public sealed class CategoryOverview { public int Id {get;set;} public string Name {get;set;}=""; public int NoteCount {get;set;} }
 }
